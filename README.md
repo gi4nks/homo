@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Novel AI Architect 🏛️
 
-## Getting Started
+A professional Next.js 16 manuscript suite enabling authors to draft books chapter-by-chapter with context-aware LLM prompts and local SQLite persistence.
 
-First, run the development server:
+## 🚀 Key Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Hierarchical Manuscript Management**: Organize your work into Books, Chapters, and Scenes.
+- **Professional Three-Pane Workspace**:
+  - **Navigator (Left)**: Drag & Drop reordering of chapters and scenes.
+  - **Writing Canvas (Center)**: Distraction-free TipTap editor with 1.5s debounced autosave.
+  - **Inspector (Right)**: Tabbed interface for Book metadata, Chapter goals, and Scene casting.
+- **Intelligent Prompt Engine**: Automatically assembles LLM prompts including global synopsis, genre rules, chapter arcs, scene cast, and previous context.
+- **Character Management**: Full CRUD for characters with roles and descriptions, including per-scene casting.
+- **Global Header**: Context-aware navigation with breadcrumbs, theme toggling, and manuscript export (.md).
+- **Manuscript Export**: Compile your entire book into a single Markdown file with a single click.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: Next.js 16 (App Router) + React 19
+- **Styling**: Tailwind CSS 4 + DaisyUI 5
+- **Database**: SQLite with Prisma 6
+- **Icons**: Lucide React
+- **Editor**: TipTap (ProseMirror)
+- **Drag & Drop**: @dnd-kit
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Getting Started
 
-## Learn More
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Setup Database**:
+   ```bash
+   npx prisma db push
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Run development server**:
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. **Build for production**:
+   ```bash
+   npm run build
+   ```
 
-## Deploy on Vercel
+## 📐 Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Context API**: `StoryContext.tsx` manages global UI state (selected scene, panel visibility, save status).
+- **Server Actions**: All database operations are handled via `src/app/actions.ts`.
+- **Atomic Components**: UI is broken down into reusable components in `src/components/`.
+- **Optimistic UI**: Drag & Drop and deletions use optimistic updates for a snappy feel.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📝 Manuscript Logic
+
+- **Word Counts**: Calculated in real-time on the client and displayed in the Navigator and Canvas Footer.
+- **Sequencing**: Managed via `orderIndex` and `chapterNumber`/`sceneNumber`. Automatic re-indexing occurs on deletion.
+- **Genre Injection**: Genre-specific rules defined in `/settings/genres` are automatically injected into the AI prompt template when a book is linked to a genre.

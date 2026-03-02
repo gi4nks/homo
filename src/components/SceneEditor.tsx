@@ -1,0 +1,170 @@
+'use client';
+
+import React, { useState, useEffect, useTransition, useCallback, useRef } from 'react';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { updateSceneContent, getSceneById } from '@/app/actions/scene.actions';
+import { 
+  Undo2, 
+  Redo2, 
+  Loader2,
+  BookOpen
+} from 'lucide-react';
+import Editor, { EditorRef } from './Editor';
+
+function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+interface SceneEditorProps {
+  bookId: string;
+}
+
+export default function SceneEditor({ bookId }: SceneEditorProps) {
+  const activeSceneId = useWorkspaceStore(state => state.activeSceneId);
+  const setUnsavedChanges = useWorkspaceStore(state => state.setUnsavedChanges);
+  const setSaveStatus = useWorkspaceStore(state => state.setSaveStatus);
+
+  const [content, setContent] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+  
+  // REFS for Bulletproof Auto-save
+  const editorRef = useRef<EditorRef>(null);
+  const contentRef = useRef<string>('');
+  const lastSavedRef = useRef<string>('');
+  const sceneIdRef = useRef<string | null>(null);
+
+  const calculateWords = (html: string) => {
+    if (!html) return 0;
+    const text = html.replace(/<[^>]*>?/gm, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    return text ? text.split(/\s+/).length : 0;
+  };
+
+  // 1. Initial Load
+  useEffect(() => {
+    if (activeSceneId) {
+      setIsLoading(true);
+      setContent(null);
+      sceneIdRef.current = activeSceneId; // Track current ID in ref
+      
+      const load = async () => {
+        const res = await getSceneById(activeSceneId);
+        if (res.success && res.data) {
+          const scene = res.data;
+          const initialContent = scene.content || '';
+          setContent(initialContent);
+          contentRef.current = initialContent;
+          lastSavedRef.current = initialContent;
+          setWordCount(calculateWords(initialContent));
+          setSaveStatus(false, new Date(scene.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+        setIsLoading(false);
+      };
+      load();
+    }
+  }, [activeSceneId, setSaveStatus]);
+
+  // 2. UNMOUNT FLUSH LOGIC
+  useEffect(() => {
+    return () => {
+      const idToSave = sceneIdRef.current;
+      const finalContent = contentRef.current;
+      const lastSaved = lastSavedRef.current;
+
+      if (idToSave && finalContent !== lastSaved) {
+        updateSceneContent(idToSave, finalContent);
+      }
+    };
+  }, [activeSceneId]); 
+
+  // 3. Debounced Auto-save
+  const debouncedContent = useDebounce(content || '', 1500);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    
+    const performSave = async () => {
+      if (activeSceneId && debouncedContent !== lastSavedRef.current && !isLoading) {
+        setSaveStatus(true, null);
+        try {
+          const res = await updateSceneContent(activeSceneId, debouncedContent);
+          if (res.success) {
+            lastSavedRef.current = debouncedContent;
+            setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            setUnsavedChanges(false);
+          } else {
+            setSaveStatus(false, "Sync Error");
+          }
+        } catch (err) {
+          setSaveStatus(false, "Error");
+        }
+      }
+    };
+
+    performSave();
+  }, [debouncedContent, activeSceneId, setUnsavedChanges, isLoading, setSaveStatus]);
+
+  const handleContentChange = (newContent: string) => {
+    setContent(newContent);
+    contentRef.current = newContent; // Sync ref instantly
+    setUnsavedChanges(true);
+    setWordCount(calculateWords(newContent));
+  };
+
+  if (!activeSceneId) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-base-100/50 border border-dashed border-base-300 rounded-xl">
+        <BookOpen className="w-12 h-12 opacity-10 mb-4 text-primary" />
+        <p className="text-xs font-black uppercase tracking-widest opacity-30">Select a scene to begin</p>
+      </div>
+    );
+  }
+
+  if (isLoading || content === null) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-base-100">
+        <Loader2 className="w-6 h-6 animate-spin text-primary opacity-20" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-white rounded-xl shadow-2xl border border-base-300 overflow-hidden relative">
+      <main className="flex-grow overflow-hidden relative bg-white">
+        <Editor ref={editorRef} key={activeSceneId} initialContent={content} onChange={handleContentChange} />
+      </main>
+
+      <footer className="bg-slate-50 p-3 px-8 flex justify-between items-center border-t border-base-300 shrink-0 z-20 rounded-b-xl">
+        {/* LEFT: Metrics */}
+        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_5px_rgba(var(--p))]"></div>
+            <span>Scene: <span className="text-slate-900 font-mono tracking-tighter text-[11px]">{wordCount.toLocaleString()}</span> Words</span>
+          </div>
+          <div className="divider divider-horizontal mx-0 h-4 opacity-20"></div>
+          <span className="opacity-40">Style: Manuscript Pro</span>
+        </div>
+
+        {/* CENTER: Status Label */}
+        <div className="hidden lg:block text-[9px] font-bold opacity-20 uppercase tracking-[0.3em]">
+          Engine v2.3 / Drafting Mode
+        </div>
+
+        {/* RIGHT: Actions */}
+        <div className="flex items-center gap-2">
+          <div className="join bg-base-200 p-0.5 rounded-lg border border-base-300">
+             <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-white text-slate-500" title="Undo" onClick={() => editorRef.current?.undo()}><Undo2 size={14} /></button>
+             <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-white text-slate-500" title="Redo" onClick={() => editorRef.current?.redo()}><Redo2 size={14} /></button>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

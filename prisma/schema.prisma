@@ -1,0 +1,81 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Book {
+  id                 String          @id @default(uuid())
+  title              String
+  genre              String          @default("") 
+  synopsis           String          @default("")
+  genreSpecificGoals String          @default("") 
+  characters         String          @default("") 
+  tone               String          @default("Professional")
+  status             String          @default("Planning")
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  chapters           Chapter[]
+  charactersList     Character[]
+  
+  // Relation to existing GenreConfig system
+  genreConfig        GenreConfig?    @relation(fields: [genreId], references: [id])
+  genreId            String?
+}
+
+model Character {
+  id          String   @id @default(uuid())
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  bookId      String
+  name        String
+  role        String   @default("") // New field
+  description String   @default("")
+  scenes      Scene[]  @relation("SceneCast")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Chapter {
+  id            String   @id @default(uuid())
+  book          Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  bookId        String
+  title         String
+  orderIndex    Int
+  chapterNumber Int      @default(1)
+  chapterGoal   String   @default("")
+  scenes        Scene[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([bookId])
+}
+
+model Scene {
+  id          String      @id @default(uuid())
+  chapter     Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  chapterId   String
+  title       String
+  content     String      @default("")
+  promptGoals String      @default("")
+  orderIndex  Int
+  sceneNumber Int         @default(1)
+  characters  Character[] @relation("SceneCast")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([chapterId])
+}
+
+model GenreConfig {
+  id                String   @id @default(uuid())
+  genreName         String   @unique
+  customPromptRules String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  books             Book[]   // Opposite relation field added here
+}
