@@ -12,11 +12,8 @@ interface ModalState {
 }
 
 interface WorkspaceState {
-  // IDs & Hierarchy
-  activeBookId: string | null;
+  // Global Metadata (Not in URL)
   activeBookTitle: string | null;
-  activeChapterId: string | null;
-  activeSceneId: string | null;
   activeTab: WorkspaceTab;
 
   // UI State
@@ -32,9 +29,7 @@ interface WorkspaceState {
   modal: ModalState;
 
   // Actions
-  setActiveBook: (id: string, title: string) => void;
-  setActiveChapter: (id: string) => void;
-  setActiveScene: (sceneId: string, chapterId: string) => void;
+  setActiveBookTitle: (title: string) => void;
   setActiveTab: (tab: WorkspaceTab) => void;
   
   toggleLeftPanel: () => void;
@@ -51,10 +46,7 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  activeBookId: null,
   activeBookTitle: null,
-  activeChapterId: null,
-  activeSceneId: null,
   activeTab: 'scene',
   
   leftPanelOpen: true,
@@ -71,21 +63,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     num: 1,
   },
 
-  setActiveBook: (id, title) => set({ 
-    activeBookId: id, 
+  setActiveBookTitle: (title) => set({ 
     activeBookTitle: title 
-  }),
-
-  setActiveChapter: (id) => set({ 
-    activeChapterId: id, 
-    activeSceneId: null, 
-    activeTab: 'chapter' 
-  }),
-
-  setActiveScene: (sceneId, chapterId) => set({ 
-    activeSceneId: sceneId, 
-    activeChapterId: chapterId, 
-    activeTab: 'scene' 
   }),
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -116,10 +95,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   })),
 
   resetWorkspace: () => set({
-    activeBookId: null,
     activeBookTitle: null,
-    activeChapterId: null,
-    activeSceneId: null,
     hasUnsavedChanges: false,
   })
 }));

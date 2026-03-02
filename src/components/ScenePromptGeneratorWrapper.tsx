@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useParams } from 'next/navigation';
 import PromptGenerator from '@/components/PromptGenerator';
 
 interface ScenePromptGeneratorWrapperProps {
@@ -9,7 +9,8 @@ interface ScenePromptGeneratorWrapperProps {
 }
 
 export default function ScenePromptGeneratorWrapper({ bookId }: ScenePromptGeneratorWrapperProps) {
-  const activeSceneId = useWorkspaceStore(state => state.activeSceneId);
+  const params = useParams();
+  const activeSceneId = params.sceneId as string;
   
   if (!activeSceneId) return null;
   

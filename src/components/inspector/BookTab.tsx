@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useParams } from 'next/navigation';
 import { updateBookBible } from '@/app/actions/book.actions';
 import { deleteCharacter } from '@/app/actions/character.actions';
 import { getGenreConfigs } from '@/app/actions/genreActions';
@@ -18,7 +19,8 @@ function useDebounce(value: string, delay: number) {
 }
 
 export default function BookTab({ book }: { book: any }) {
-  const activeBookId = useWorkspaceStore((state) => state.activeBookId);
+  const params = useParams();
+  const activeBookId = params.bookId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
   const [genres, setGenres] = useState<any[]>([]);
   const [isPending, startTransition] = useTransition();

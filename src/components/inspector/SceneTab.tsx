@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useParams } from 'next/navigation';
 import { updateScenePromptGoals, toggleCharacterInScene } from '@/app/actions/scene.actions';
 import { Sparkles, Users, RefreshCw } from 'lucide-react';
 
@@ -16,7 +17,8 @@ function useDebounce(value: string, delay: number) {
 }
 
 export default function SceneTab({ book }: { book: any }) {
-  const activeSceneId = useWorkspaceStore((state) => state.activeSceneId);
+  const params = useParams();
+  const activeSceneId = params.sceneId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
   const [isPending, startTransition] = useTransition();
 

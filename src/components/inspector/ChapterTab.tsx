@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useParams } from 'next/navigation';
 import { updateChapter } from '@/app/actions/chapter.actions';
 import { Layers, RefreshCw } from 'lucide-react';
 
@@ -15,7 +16,8 @@ function useDebounce(value: string, delay: number) {
 }
 
 export default function ChapterTab({ book }: { book: any }) {
-  const activeChapterId = useWorkspaceStore((state) => state.activeChapterId);
+  const params = useParams();
+  const activeChapterId = params.chapterId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
 
   // Find chapter from book prop

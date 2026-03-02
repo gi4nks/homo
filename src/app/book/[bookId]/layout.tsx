@@ -8,10 +8,13 @@ export default async function BookLayout({
   params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ id: string }>;
+  params: Promise<{ bookId: string }>;
 }) {
-  const { id } = await params;
-  const book = await getBookById(id);
+  const { bookId } = await params;
+  
+  if (!bookId) notFound();
+  
+  const book = await getBookById(bookId);
 
   if (!book) notFound();
 
@@ -23,7 +26,7 @@ export default async function BookLayout({
   };
 
   return (
-    <LayoutClientInternal book={formattedBook} params={{ id }}>
+    <LayoutClientInternal book={formattedBook} params={{ id: bookId }}>
       {children}
     </LayoutClientInternal>
   );

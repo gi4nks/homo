@@ -26,7 +26,7 @@ import ScenePromptGeneratorWrapper from './ScenePromptGeneratorWrapper';
 export default function GlobalHeader() {
   const pathname = usePathname();
   const { 
-    activeBookTitle, activeBookId, saveStatus, 
+    activeBookTitle, saveStatus, 
     leftPanelOpen, toggleLeftPanel,
     rightPanelOpen, toggleRightPanel
   } = useWorkspaceStore();
@@ -54,7 +54,7 @@ export default function GlobalHeader() {
   const derivedBookId = isBookWorkspace ? pathParts[2] : null;
 
   const handleExport = async () => {
-    const targetId = derivedBookId || activeBookId;
+    const targetId = derivedBookId;
     
     if (!targetId) {
       alert("Error: Missing manuscript ID");
@@ -148,8 +148,8 @@ export default function GlobalHeader() {
           </>
         )}
 
-        {isBookWorkspace && (derivedBookId || activeBookId) && (
-          <ScenePromptGeneratorWrapper bookId={(derivedBookId || activeBookId)!} />
+        {isBookWorkspace && derivedBookId && (
+          <ScenePromptGeneratorWrapper bookId={derivedBookId} />
         )}
 
         <div className="divider divider-horizontal mx-0 h-6 opacity-10"></div>

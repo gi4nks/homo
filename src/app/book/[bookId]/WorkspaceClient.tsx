@@ -3,28 +3,32 @@
 import React from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import ChapterManager from '@/components/ChapterManager';
-import SceneEditor from '@/components/SceneEditor';
 import Inspector from '@/components/Inspector';
 import { 
   BookOpen, 
-  PanelLeftClose,
   PanelRightClose
 } from 'lucide-react';
 
-export default function WorkspaceClient({ book }: { book: any }) {
+interface WorkspaceClientProps {
+  book: any;
+  bookId: string;
+  children: React.ReactNode;
+}
+
+export default function WorkspaceClient({ book, bookId, children }: WorkspaceClientProps) {
   const leftPanelOpen = useWorkspaceStore(state => state.leftPanelOpen);
   const rightPanelOpen = useWorkspaceStore(state => state.rightPanelOpen);
   const toggleLeftPanel = useWorkspaceStore(state => state.toggleLeftPanel);
   const toggleRightPanel = useWorkspaceStore(state => state.toggleRightPanel);
-  const setActiveBook = useWorkspaceStore(state => state.setActiveBook);
+  const setActiveBookTitle = useWorkspaceStore(state => state.setActiveBookTitle);
 
-  // Sync book title & ID to global store
+  // Sync book title to global store for the Header
   React.useEffect(() => {
-    setActiveBook(book.id, book.title);
-  }, [book.id, book.title, setActiveBook]);
+    setActiveBookTitle(book.title);
+  }, [book.title, setActiveBookTitle]);
 
   return (
-    <div className="flex flex-grow overflow-hidden bg-base-100 relative">
+    <div className="flex flex-grow overflow-hidden bg-base-100 relative h-[calc(100vh-4rem)]">
       
       {/* ATMOSPHERE BACKGROUND */}
       <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.04] overflow-hidden">
@@ -34,23 +38,23 @@ export default function WorkspaceClient({ book }: { book: any }) {
 
       {/* 1. LEFT PANEL: NAVIGATOR */}
       <aside 
-        className={`bg-base-100/80 backdrop-blur-md border-r border-base-300 transition-all duration-300 ease-in-out flex flex-col shrink-0 h-[calc(100vh-3.5rem)] z-20 ${
+        className={`bg-base-100/80 backdrop-blur-md border-r border-base-300 transition-all duration-300 ease-in-out flex flex-col shrink-0 h-full z-20 ${
           leftPanelOpen ? 'w-80' : 'w-0 opacity-0 -translate-x-10 invisible overflow-hidden'
         }`}
       >
-        <ChapterManager bookId={book.id} chapters={book.chapters} onClose={toggleLeftPanel} />
+        <ChapterManager bookId={bookId} chapters={book.chapters} onClose={toggleLeftPanel} />
       </aside>
 
       {/* 2. CENTER PANEL: THE CANVAS */}
-      <section className="flex-grow flex flex-col relative overflow-hidden h-[calc(100vh-3.5rem)] z-10">
+      <section className="flex-grow flex flex-col relative overflow-hidden h-full z-10">
         <div className="flex-grow overflow-hidden h-full bg-base-200/20 p-4 md:p-8">
-           <SceneEditor bookId={book.id} />
+           {children}
         </div>
       </section>
 
       {/* 3. RIGHT PANEL: THE INSPECTOR */}
       <aside 
-        className={`bg-base-50/80 backdrop-blur-md border-l border-base-300 transition-all duration-300 ease-in-out flex flex-col shrink-0 h-[calc(100vh-3.5rem)] z-20 ${
+        className={`bg-base-50/80 backdrop-blur-md border-l border-base-300 transition-all duration-300 ease-in-out flex flex-col shrink-0 h-full z-20 ${
           rightPanelOpen ? 'w-80' : 'w-0 opacity-0 translate-x-10 invisible overflow-hidden'
         }`}
       >

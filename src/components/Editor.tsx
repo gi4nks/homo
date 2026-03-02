@@ -21,6 +21,8 @@ interface EditorProps {
 export interface EditorRef {
   undo: () => void;
   redo: () => void;
+  setContent: (content: string) => void;
+  insertContent: (content: string) => void;
 }
 
 const Editor = forwardRef<EditorRef, EditorProps>(({ initialContent, onChange }, ref) => {
@@ -53,6 +55,8 @@ const Editor = forwardRef<EditorRef, EditorProps>(({ initialContent, onChange },
   useImperativeHandle(ref, () => ({
     undo: () => editor?.chain().focus().undo().run(),
     redo: () => editor?.chain().focus().redo().run(),
+    setContent: (content: string) => editor?.commands.setContent(content),
+    insertContent: (content: string) => editor?.chain().focus().insertContent(content).run(),
   }));
 
   // Aggiorna il conteggio al montaggio
