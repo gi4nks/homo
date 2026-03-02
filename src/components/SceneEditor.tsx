@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useRef, startTransition } from 'react';
+import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { updateSceneContent, getSceneById } from '@/app/actions/scene.actions';
 import { 
@@ -35,15 +35,6 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [wordCount, setWordCount] = useState(0);
-
-  if (!sceneId) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center bg-base-100/50 border border-dashed border-base-300 rounded-xl">
-        <BookOpen className="w-12 h-12 opacity-10 mb-4 text-primary" />
-        <p className="text-xs font-black uppercase tracking-widest opacity-30">Select a scene to begin</p>
-      </div>
-    );
-  }
   
   const editorRef = useRef<EditorRef>(null);
   const contentRef = useRef<string>('');
@@ -160,6 +151,16 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     setUnsavedChanges(true);
     setWordCount(calculateWords(newContent));
   };
+
+  // EARLY RETURN FOR MISSING SCENE ID
+  if (!sceneId) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-base-100/50 border border-dashed border-base-300 rounded-xl">
+        <BookOpen className="w-12 h-12 opacity-10 mb-4 text-primary" />
+        <p className="text-xs font-black uppercase tracking-widest opacity-30">Select a scene to begin</p>
+      </div>
+    );
+  }
 
   if (isLoading || content === null) {
     return (

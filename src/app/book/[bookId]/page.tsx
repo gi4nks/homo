@@ -1,4 +1,4 @@
-import { getBookById } from '@/app/actions';
+import { getBookById } from '@/app/actions/book.actions';
 import { notFound, redirect } from 'next/navigation';
 
 export default async function BookDashboard({ 
@@ -8,8 +8,10 @@ export default async function BookDashboard({
 }) {
   const { bookId } = await params;
   
-  const book = await getBookById(bookId);
-  if (!book) notFound();
+  const response = await getBookById(bookId);
+  if (!response.success || !response.data) notFound();
+
+  const book = response.data;
 
   // Redirect to first scene if it exists
   const firstChapter = book.chapters[0];

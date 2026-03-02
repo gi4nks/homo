@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition, useRef } from 'react';
-import { generatePromptData } from '@/app/actions';
+import { generatePromptData } from '@/app/actions/ai.actions';
 import { Sparkles, Copy, Check, X, RefreshCw, AlertCircle, Zap } from 'lucide-react';
 
 interface PromptGeneratorProps {

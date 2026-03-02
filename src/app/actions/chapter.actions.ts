@@ -2,8 +2,9 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { CreateChapterSchema, UpdateChapterSchema, ReorderChaptersSchema, IdSchema, CloneItemSchema } from '@/lib/validations';
+import { CreateChapterSchema, UpdateChapterSchema, ReorderChaptersSchema, IdSchema, CloneItemSchema, ReorderPayloadSchema } from '@/lib/validations';
 import { ActionResponse } from './scene.actions';
+import { z } from 'zod';
 
 export async function createChapter(bookId: string, title: string): Promise<ActionResponse> {
   const validated = CreateChapterSchema.safeParse({ bookId, title });
@@ -75,18 +76,22 @@ export async function deleteChapter(id: string): Promise<ActionResponse> {
   }
 }
 
-export async function reorderChapters(bookId: string, updates: any[]): Promise<ActionResponse> {
-  const validated = ReorderChaptersSchema.safeParse({ bookId, updates });
-  if (!validated.success) return { success: false, error: "Invalid sequence data" };
+export async function reorderChapters(bookId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse> {
+  const validatedParent = IdSchema.safeParse(bookId);
+  const validatedUpdates = ReorderPayloadSchema.safeParse(updates);
+
+  if (!validatedParent.success || !validatedUpdates.success) {
+    return { success: false, error: "Invalid reorder payload" };
+  }
 
   try {
     await prisma.$transaction(
-      validated.data.updates.map(u => prisma.chapter.update({
+      validatedUpdates.data.map(u => prisma.chapter.update({
         where: { id: u.id },
         data: { orderIndex: u.orderIndex, chapterNumber: u.orderIndex }
       }))
     );
-    revalidatePath(`/book/${validated.data.bookId}`);
+    revalidatePath(`/book/${validatedParent.data}`);
     return { success: true, data: null };
   } catch (error) {
     return { success: false, error: "Failed to reorder chapters" };

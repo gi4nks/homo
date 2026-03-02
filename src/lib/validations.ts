@@ -4,6 +4,12 @@ import { z } from 'zod';
 export const IdSchema = z.string().uuid();
 export const CloneItemSchema = z.object({ id: IdSchema });
 
+export const ReorderItemSchema = z.object({
+  id: IdSchema,
+  orderIndex: z.number().int().nonnegative(),
+});
+export const ReorderPayloadSchema = z.array(ReorderItemSchema);
+
 // --- BOOK VALIDATIONS ---
 export const CreateBookSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),

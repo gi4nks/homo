@@ -10,8 +10,10 @@ import {
   CreateSceneSchema,
   UpdateSceneSchema,
   ToggleCharacterInSceneSchema,
-  CloneItemSchema
+  CloneItemSchema,
+  ReorderPayloadSchema
 } from '@/lib/validations';
+import { z } from 'zod';
 
 // --- STANDARDIZED RESPONSE TYPE ---
 
@@ -114,18 +116,22 @@ export async function deleteScene(id: string): Promise<ActionResponse> {
   }
 }
 
-export async function reorderScenes(chapterId: string, updates: any[]): Promise<ActionResponse> {
-  const validated = ReorderScenesSchema.safeParse({ chapterId, updates });
-  if (!validated.success) return { success: false, error: "Invalid sequence data" };
+export async function reorderScenes(chapterId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse> {
+  const validatedParent = IdSchema.safeParse(chapterId);
+  const validatedUpdates = ReorderPayloadSchema.safeParse(updates);
+
+  if (!validatedParent.success || !validatedUpdates.success) {
+    return { success: false, error: "Invalid reorder payload" };
+  }
 
   try {
     await prisma.$transaction(
-      validated.data.updates.map(u => prisma.scene.update({
+      validatedUpdates.data.map(u => prisma.scene.update({
         where: { id: u.id },
         data: { orderIndex: u.orderIndex, sceneNumber: u.orderIndex }
       }))
     );
-    const chapter = await prisma.chapter.findUnique({ where: { id: validated.data.chapterId } });
+    const chapter = await prisma.chapter.findUnique({ where: { id: validatedParent.data } });
     if (chapter) revalidatePath(`/book/${chapter.bookId}`);
     return { success: true, data: null };
   } catch (err) {

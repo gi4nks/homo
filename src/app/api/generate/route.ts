@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
-import { generatePromptData } from '@/app/actions';
+import { generatePromptData } from '@/app/actions/ai.actions';
 import prisma from '@/lib/prisma';
 
 export const maxDuration = 60; 

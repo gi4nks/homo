@@ -1,4 +1,4 @@
-import { getBookById } from '@/app/actions';
+import { getBookById } from '@/app/actions/book.actions';
 import { notFound, redirect } from 'next/navigation';
 
 export default async function ChapterPage({ 
@@ -8,11 +8,13 @@ export default async function ChapterPage({
 }) {
   const { bookId, chapterId } = await params;
   
-  const book = await getBookById(bookId);
-  if (!book) notFound();
+  const response = await getBookById(bookId);
+  if (!response.success || !response.data) notFound();
+
+  const book = response.data;
 
   // Optionally, redirect to the first scene of this chapter if it exists
-  const chapter = book.chapters.find(c => c.id === chapterId);
+  const chapter = book.chapters.find((c: any) => c.id === chapterId);
   const firstScene = chapter?.scenes[0];
 
   if (firstScene) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { getBookById } from '@/app/actions';
+import { getBookById } from '@/app/actions/book.actions';
 import { notFound } from 'next/navigation';
 import LayoutClientInternal from './layout_client_internal';
 
@@ -14,9 +14,11 @@ export default async function BookLayout({
   
   if (!bookId) notFound();
   
-  const book = await getBookById(bookId);
+  const response = await getBookById(bookId);
 
-  if (!book) notFound();
+  if (!response.success || !response.data) notFound();
+
+  const book = response.data;
 
   // Convert dates to strings for safe serialization to Client Component
   const formattedBook = {

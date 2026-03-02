@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
-import { createBook, deleteBook } from '@/app/actions';
+import { createBook, deleteBook } from '@/app/actions/book.actions';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -71,9 +71,13 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
     const tone = formData.get('tone') as string;
     if (!title) return;
     startTransition(async () => {
-      const book = await createBook({ title, genre, tone, status: 'Planning' });
-      setShowModal(false);
-      router.push(`/book/${book.id}`);
+      const res = await createBook({ title, genre, tone, status: 'Planning' });
+      if (res.success) {
+        setShowModal(false);
+        router.push(`/book/${res.data.id}`);
+      } else {
+        alert(res.error);
+      }
     });
   };
 
