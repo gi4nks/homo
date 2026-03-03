@@ -8,7 +8,8 @@ import {
   Redo2, 
   Loader2,
   BookOpen,
-  Sparkles
+  Sparkles,
+  Maximize2
 } from 'lucide-react';
 import Editor, { EditorRef } from './Editor';
 import { useAiStream } from '@/hooks/useAiStream';
@@ -31,6 +32,8 @@ interface SceneEditorProps {
 export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const setUnsavedChanges = useWorkspaceStore(state => state.setUnsavedChanges);
   const setSaveStatus = useWorkspaceStore(state => state.setSaveStatus);
+  const isFocusMode = useWorkspaceStore(state => state.isFocusMode);
+  const toggleFocusMode = useWorkspaceStore(state => state.toggleFocusMode);
 
   const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,6 +53,28 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     startStream, 
     clearProposal 
   } = useAiStream();
+
+  // --- KEYBOARD SHORTCUTS ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 1. Trigger AI Generation: Cmd + Enter or Ctrl + Enter
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!isAiLoading && sceneId) {
+          startStream(bookId, sceneId);
+        }
+      }
+
+      // 2. Toggle Focus Mode: Escape
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        toggleFocusMode();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [bookId, sceneId, isAiLoading, startStream, toggleFocusMode]);
 
   const handleAcceptProposal = async () => {
     if (!aiProposal) return;
@@ -175,7 +200,14 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     <div className="flex flex-col h-full bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden relative">
       <main className="flex-grow overflow-hidden relative bg-base-100 flex flex-col">
         <div className="flex-grow overflow-hidden relative">
-          <Editor ref={editorRef} key={sceneId} initialContent={content} onChange={handleContentChange} />
+          <Editor 
+            ref={editorRef} 
+            key={sceneId} 
+            initialContent={content} 
+            bookId={bookId}
+            sceneId={sceneId}
+            onChange={handleContentChange} 
+          />
         </div>
 
         <AiProposalBox 
@@ -203,6 +235,16 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* FOCUS MODE TOGGLE */}
+          <button 
+            type="button"
+            className={`btn btn-xs btn-square transition-all ${isFocusMode ? 'btn-primary shadow-lg shadow-primary/20' : 'btn-ghost text-base-content/30 hover:text-primary'}`}
+            onClick={toggleFocusMode}
+            title="Focus Mode (Esc)"
+          >
+            <Maximize2 size={14} />
+          </button>
+
           <button 
             type="button"
             className={`btn btn-xs gap-2 ${isAiLoading ? 'btn-disabled bg-base-300' : 'btn-primary shadow-lg shadow-primary/20 hover:scale-[1.02]'} transition-all px-4`}

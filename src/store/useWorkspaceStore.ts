@@ -19,6 +19,7 @@ interface WorkspaceState {
   // UI State
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
+  isFocusMode: boolean;
   hasUnsavedChanges: boolean;
   saveStatus: {
     isSaving: boolean;
@@ -34,6 +35,7 @@ interface WorkspaceState {
   
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
+  toggleFocusMode: () => void;
   setUnsavedChanges: (status: boolean) => void;
   setSaveStatus: (isSaving: boolean, lastSynced?: string | null) => void;
   
@@ -51,6 +53,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   
   leftPanelOpen: true,
   rightPanelOpen: true,
+  isFocusMode: false,
   hasUnsavedChanges: false,
   saveStatus: { isSaving: false, lastSynced: null },
   
@@ -72,6 +75,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   toggleLeftPanel: () => set((state) => ({ leftPanelOpen: !state.leftPanelOpen })),
   
   toggleRightPanel: () => set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
+
+  toggleFocusMode: () => set((state) => ({ 
+    isFocusMode: !state.isFocusMode,
+    leftPanelOpen: state.isFocusMode ? true : false,
+    rightPanelOpen: state.isFocusMode ? true : false,
+  })),
 
   setUnsavedChanges: (status) => set({ hasUnsavedChanges: status }),
 
