@@ -3,6 +3,8 @@ import { getBookById } from '@/app/actions/book.actions';
 import { notFound } from 'next/navigation';
 import LayoutClientInternal from './layout_client_internal';
 
+export const dynamic = 'force-dynamic';
+
 export default async function BookLayout({
   children,
   params,

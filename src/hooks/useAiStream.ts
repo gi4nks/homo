@@ -1,20 +1,28 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { generatePromptData } from '@/app/actions/ai.actions';
 
 export function useAiStream() {
   const [aiProposal, setAiProposal] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [promptBlueprint, setPromptBlueprint] = useState<string | null>(null);
 
-  const startStream = useCallback(async (sceneId: string) => {
-    if (!sceneId) return;
+  const startStream = useCallback(async (bookId: string, sceneId: string) => {
+    if (!sceneId || !bookId) return;
     
     setIsAiLoading(true);
     setAiProposal("");
     setAiError(null);
+    setPromptBlueprint(null);
 
     try {
+      // 1. Fetch the blueprint first for transparency
+      const blueprint = await generatePromptData(bookId, sceneId);
+      setPromptBlueprint(blueprint);
+
+      // 2. Start the actual stream
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,12 +62,14 @@ export function useAiStream() {
   const clearProposal = useCallback(() => {
     setAiProposal("");
     setAiError(null);
+    setPromptBlueprint(null);
   }, []);
 
   return {
     aiProposal,
     isAiLoading,
     aiError,
+    promptBlueprint,
     startStream,
     clearProposal
   };

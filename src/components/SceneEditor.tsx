@@ -46,6 +46,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     aiProposal, 
     isAiLoading, 
     aiError, 
+    promptBlueprint,
     startStream, 
     clearProposal 
   } = useAiStream();
@@ -171,8 +172,8 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-xl shadow-2xl border border-base-300 overflow-hidden relative">
-      <main className="flex-grow overflow-hidden relative bg-white flex flex-col">
+    <div className="flex flex-col h-full bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden relative">
+      <main className="flex-grow overflow-hidden relative bg-base-100 flex flex-col">
         <div className="flex-grow overflow-hidden relative">
           <Editor ref={editorRef} key={sceneId} initialContent={content} onChange={handleContentChange} />
         </div>
@@ -181,16 +182,17 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
           proposal={aiProposal}
           isLoading={isAiLoading}
           error={aiError}
+          promptBlueprint={promptBlueprint}
           onAccept={handleAcceptProposal}
           onDiscard={clearProposal}
         />
       </main>
 
-      <footer className="bg-slate-50 p-3 px-8 flex justify-between items-center border-t border-base-300 shrink-0 z-20 rounded-b-xl">
-        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-slate-500">
+      <footer className="bg-base-200 p-3 px-8 flex justify-between items-center border-t border-base-300 shrink-0 z-20 rounded-b-xl">
+        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-base-content/50">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_5px_rgba(var(--p))]"></div>
-            <span>Scene: <span className="text-slate-900 font-mono tracking-tighter text-[11px]">{wordCount.toLocaleString()}</span> Words</span>
+            <span>Scene: <span className="text-base-content font-mono tracking-tighter text-[11px]">{wordCount.toLocaleString()}</span> Words</span>
           </div>
           <div className="divider divider-horizontal mx-0 h-4 opacity-20"></div>
           <span className="opacity-40">Style: Manuscript Pro</span>
@@ -206,7 +208,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             className={`btn btn-xs gap-2 ${isAiLoading ? 'btn-disabled bg-base-300' : 'btn-primary shadow-lg shadow-primary/20 hover:scale-[1.02]'} transition-all px-4`}
             onMouseDown={(e) => { 
               e.preventDefault(); 
-              if (!isAiLoading && sceneId) startStream(sceneId); 
+              if (!isAiLoading && sceneId) startStream(bookId, sceneId); 
             }}
             disabled={isAiLoading}
           >
@@ -218,9 +220,9 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             <span className="text-[10px] font-black uppercase tracking-tight">Generate AI ✨</span>
           </button>
 
-          <div className="join bg-base-200 p-0.5 rounded-lg border border-base-300">
-             <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-white text-slate-500" title="Undo" onClick={() => editorRef.current?.undo()}><Undo2 size={14} /></button>
-             <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-white text-slate-500" title="Redo" onClick={() => editorRef.current?.redo()}><Redo2 size={14} /></button>
+          <div className="join bg-base-300/50 p-0.5 rounded-lg border border-base-300">
+             <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-base-100 text-base-content/50" title="Undo" onClick={() => editorRef.current?.undo()}><Undo2 size={14} /></button>
+             <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-base-100 text-base-content/50" title="Redo" onClick={() => editorRef.current?.redo()}><Redo2 size={14} /></button>
           </div>
         </div>
       </footer>

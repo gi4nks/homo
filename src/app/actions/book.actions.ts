@@ -62,15 +62,19 @@ export async function createBook(input: any): Promise<ActionResponse> {
 
 export async function updateBookBible(id: string, data: any): Promise<ActionResponse> {
   const validated = UpdateBookBibleSchema.safeParse({ id, ...data });
-  if (!validated.success) return { success: false, error: "Invalid data", validationErrors: validated.error.format() };
+  if (!validated.success) {
+    return { success: false, error: "Invalid data", validationErrors: validated.error.format() };
+  }
 
   try {
     const { id: bookId, ...payload } = validated.data;
+
     const book = await prisma.book.update({
       where: { id: bookId },
       data: payload,
     });
-    revalidatePath(`/book/${bookId}`);
+
+    revalidatePath(`/book/${bookId}`, 'layout');
     revalidatePath('/');
     return { success: true, data: book };
   } catch (error) {

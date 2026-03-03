@@ -40,7 +40,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 interface Scene { id: string; title: string; content: string; orderIndex: number; sceneNumber: number; }
 interface Chapter { id: string; title: string; orderIndex: number; chapterNumber: number; scenes: Scene[]; }
@@ -54,6 +54,7 @@ const FormattedNumber = ({ value }: { value: number }) => {
 // --- SORTABLE SCENE ---
 const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: string, bookId: string }) => {
   const params = useParams();
+  const router = useRouter();
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
   const [isPending, startTransition] = useTransition();
   
@@ -69,15 +70,15 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
 
   return (
     <li ref={setNodeRef} style={style} className={`w-full list-none ${isDragging ? 'opacity-50' : ''}`}>
-      <Link 
-        href={`/book/${bookId}/chapter/${chapterId}/scene/${scene.id}`}
-        className={`flex items-start gap-2 w-full p-2.5 rounded-lg group/scene transition-all border-l-4 ${
+      <div 
+        onClick={() => router.push(`/book/${bookId}/chapter/${chapterId}/scene/${scene.id}`)}
+        className={`flex items-start gap-2 w-full p-2.5 rounded-lg group/scene transition-all border-l-4 cursor-pointer ${
           isSelected 
             ? 'bg-primary/10 border-l-primary text-primary shadow-sm font-black' 
             : 'hover:bg-base-200 border-l-transparent text-base-content/60'
         }`}
       >
-        <div {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing opacity-0 group-hover/scene:opacity-30" onClick={(e) => e.preventDefault()}>
+        <div {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing opacity-0 group-hover/scene:opacity-30" onClick={(e) => e.stopPropagation()}>
           <GripVertical size={12} />
         </div>
         <div className="flex flex-col flex-grow min-w-0">
@@ -89,10 +90,10 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
            </span>
         </div>
         <div className="flex gap-0.5 opacity-0 group-hover/scene:opacity-100 transition-opacity shrink-0">
-          <button className="btn btn-ghost btn-xs btn-square" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openMetadataModal('rename_scene', bookId, scene.id, scene.title, scene.sceneNumber); }}><Edit2 size={10} /></button>
-          <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if(confirm(`Delete Scene "${scene.title}"?`)) startTransition(async () => { await deleteScene(scene.id); }); }}><Trash2 size={10} /></button>
+          <button className="btn btn-ghost btn-xs btn-square" onClick={(e) => { e.stopPropagation(); openMetadataModal('rename_scene', bookId, scene.id, scene.title, scene.sceneNumber); }}><Edit2 size={10} /></button>
+          <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { e.stopPropagation(); if(confirm(`Delete Scene "${scene.title}"?`)) startTransition(async () => { await deleteScene(scene.id); }); }}><Trash2 size={10} /></button>
         </div>
-      </Link>
+      </div>
     </li>
   );
 };
@@ -100,6 +101,7 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
 // --- SORTABLE CHAPTER ---
 const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapters }: { chapter: Chapter, bookId: string, expandedChapters: Set<string>, setExpandedChapters: any }) => {
   const params = useParams();
+  const router = useRouter();
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
   const [isPending, startTransition] = useTransition();
   
@@ -121,28 +123,26 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
   return (
     <li ref={setNodeRef} style={style} className={`w-full list-none ${isDragging ? 'opacity-50' : ''}`}>
       <div className="flex flex-col w-full p-0">
-        <Link 
-          href={`/book/${bookId}/chapter/${chapter.id}`}
+        <div 
+          onClick={() => router.push(`/book/${bookId}/chapter/${chapter.id}`)}
           className={`flex items-start gap-2 w-full p-2.5 rounded-xl group/chapter cursor-pointer border transition-all ${
             isChapterActive 
               ? 'bg-base-200 border-base-300 text-primary font-black shadow-inner' 
               : 'border-transparent hover:bg-base-200 text-base-content/80 font-bold'
           }`}
         >
-          <div {...attributes} {...listeners} className="mt-1.5 cursor-grab active:cursor-grabbing opacity-0 group-hover/chapter:opacity-30" onClick={(e) => e.preventDefault()}>
+          <div {...attributes} {...listeners} className="mt-1.5 cursor-grab active:cursor-grabbing opacity-0 group-hover/chapter:opacity-30" onClick={(e) => e.stopPropagation()}>
             <GripVertical size={14} />
           </div>
           
           <div 
             className="mt-1 transition-transform duration-200 hover:scale-110"
             onClick={(e) => { 
-              e.preventDefault(); 
               e.stopPropagation(); 
               setExpandedChapters((prev: Set<string>) => {
                 const n = new Set(prev);
                 if (n.has(chapter.id)) n.delete(chapter.id);
                 else {
-                  // Exclusive expansion: clear all others if we manually click a folder
                   n.clear();
                   n.add(chapter.id);
                 }
@@ -163,11 +163,11 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
           </div>
 
           <div className="flex gap-0.5 opacity-0 group-hover/chapter:opacity-100 transition-opacity shrink-0">
-             <button className="btn btn-ghost btn-xs btn-square text-primary" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openMetadataModal('create_scene', bookId, chapter.id); }}><Plus size={14} /></button>
-             <button className="btn btn-ghost btn-xs btn-square" onClick={(e) => { e.preventDefault(); e.stopPropagation(); openMetadataModal('rename_chapter', bookId, chapter.id, chapter.title, chapter.chapterNumber); }}><Edit2 size={12} /></button>
-             <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if(confirm(`Delete Chapter "${chapter.title}"?`)) startTransition(async () => { await deleteChapter(chapter.id); }); }}><Trash2 size={12} /></button>
+             <button className="btn btn-ghost btn-xs btn-square text-primary" onClick={(e) => { e.stopPropagation(); openMetadataModal('create_scene', bookId, chapter.id); }}><Plus size={14} /></button>
+             <button className="btn btn-ghost btn-xs btn-square" onClick={(e) => { e.stopPropagation(); openMetadataModal('rename_chapter', bookId, chapter.id, chapter.title, chapter.chapterNumber); }}><Edit2 size={12} /></button>
+             <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { e.stopPropagation(); if(confirm(`Delete Chapter "${chapter.title}"?`)) startTransition(async () => { await deleteChapter(chapter.id); }); }}><Trash2 size={12} /></button>
           </div>
-        </Link>
+        </div>
 
         {isExpanded && (
           <ul className="ml-6 mt-1 border-l border-base-300/50 pl-2 flex flex-col gap-1 w-[calc(100%-1.5rem)] animate-in slide-in-from-left-1 duration-200">
@@ -192,13 +192,11 @@ const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: 
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
   const id = useId();
 
-  // 1. Initial mounting and sorting
   useEffect(() => { 
     setMounted(true);
     setLocalChapters([...chapters].sort((a,b) => a.orderIndex - b.orderIndex)); 
   }, [chapters]);
 
-  // 2. EXCLUSIVE EXPANSION LOGIC: Keep current chapter open, close others
   useEffect(() => {
     if (params.chapterId) {
       setExpandedChapters(new Set([params.chapterId as string]));

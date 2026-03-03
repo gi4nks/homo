@@ -74,8 +74,11 @@ export default function BookTab({ book }: { book: any }) {
         </label>
         <select 
           className="select select-bordered select-sm w-full font-bold bg-base-100"
-          defaultValue={book.genreId || ""}
-          onChange={(e) => saveField({ genreId: e.target.value || null })}
+          value={book.genreId || ""}
+          onChange={(e) => {
+            const val = e.target.value || null;
+            saveField({ genreId: val });
+          }}
         >
           <option value="">None / Manual</option>
           {genres.map(g => (<option key={g.id} value={g.id}>{g.genreName}</option>))}

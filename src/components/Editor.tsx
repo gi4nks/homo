@@ -43,7 +43,7 @@ const Editor = forwardRef<EditorRef, EditorProps>(({ initialContent, onChange },
     content: initialContent,
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose-base lg:prose-lg xl:prose-2xl focus:outline-none min-h-[500px] max-w-none p-12 md:p-24 bg-white shadow-sm border border-base-300 rounded-lg selection:bg-primary/20 leading-[2.2] font-serif',
+        class: 'prose prose-sm sm:prose-base lg:prose-lg xl:prose-2xl dark:prose-invert focus:outline-none min-h-[500px] max-w-none p-12 md:p-24 bg-base-100 shadow-sm border border-base-300 rounded-lg selection:bg-primary/20 leading-[2.2] font-serif',
       },
     },
     onUpdate: ({ editor }) => {

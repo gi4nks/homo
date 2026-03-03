@@ -2,11 +2,13 @@
 
 import React, { useTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useParams } from 'next/navigation';
 import { createChapter, updateChapter } from '@/app/actions/chapter.actions';
 import { createScene, updateScene } from '@/app/actions/scene.actions';
 import { X, Hash } from 'lucide-react';
 
 export default function GlobalModals() {
+  const params = useParams();
   const { modal, closeMetadataModal, updateModalData } = useWorkspaceStore();
   const [isPending, startTransition] = useTransition();
 
@@ -19,13 +21,36 @@ export default function GlobalModals() {
       const { mode, bookId, targetId, title, num } = modal;
       let res;
       
-      if (mode === 'create_chapter') res = await createChapter(bookId, title);
-      else if (mode === 'create_scene' && targetId) res = await createScene(targetId, title);
-      else if (mode === 'rename_chapter' && targetId) res = await updateChapter(targetId, { title, chapterNumber: num });
-      else if (mode === 'rename_scene' && targetId) res = await updateScene(targetId, { title, sceneNumber: num });
+      // FALLBACK: If we are creating a scene but targetId (chapterId) is missing, 
+      // try to grab it from the URL params.
+      const resolvedTargetId = targetId || (mode === 'create_scene' ? params.chapterId as string : null);
+
+      console.log(`--- MODAL DEBUG: ${mode} ---`);
+      console.log('Book ID:', bookId);
+      console.log('Target ID (Original):', targetId);
+      console.log('Target ID (Resolved):', resolvedTargetId);
+      console.log('Title:', title);
+
+      if (mode === 'create_chapter') {
+        res = await createChapter(bookId, title);
+      } else if (mode === 'create_scene') {
+        if (!resolvedTargetId) {
+          alert("Error: No chapter selected to add scene to.");
+          return;
+        }
+        res = await createScene(resolvedTargetId, title);
+      } else if (mode === 'rename_chapter' && targetId) {
+        res = await updateChapter(targetId, { title, chapterNumber: num });
+      } else if (mode === 'rename_scene' && targetId) {
+        res = await updateScene(targetId, { title, sceneNumber: num });
+      }
       
-      if (res?.success) closeMetadataModal();
-      else alert(res?.error || "Operation failed");
+      if (res?.success) {
+        closeMetadataModal();
+      } else {
+        console.error('Modal Action Failed:', res);
+        alert(res?.error || "Operation failed");
+      }
     });
   };
 
