@@ -4,7 +4,7 @@ import React, { useState, useEffect, useTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useParams } from 'next/navigation';
 import { updateScenePromptGoals, toggleCharacterInScene } from '@/app/actions/scene.actions';
-import { Sparkles, Users, RefreshCw, Target } from 'lucide-react';
+import { Sparkles, Users, RefreshCw, Target, X } from 'lucide-react';
 
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -58,7 +58,9 @@ export default function SceneTab({ book }: { book: any }) {
                   key={char.id}
                   onClick={() => toggleCharacterInScene(activeSceneId, char.id)}
                   className={`btn btn-xs rounded-full px-3 border transition-all ${
-                    isSelected ? 'btn-secondary border-secondary shadow-md' : 'btn-ghost border-base-300 opacity-50 grayscale hover:grayscale-0'
+                    isSelected 
+                      ? 'btn-secondary border-secondary shadow-md font-black' 
+                      : 'btn-ghost border-base-300 opacity-40 grayscale hover:grayscale-0 hover:opacity-100'
                   }`}
                 >
                   {char.name}

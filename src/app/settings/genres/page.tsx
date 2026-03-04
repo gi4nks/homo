@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useTransition } from 'react';
 import { getGenreConfigs, deleteGenreConfig } from '@/app/actions/genreActions';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import Link from 'next/link';
 import { 
   Plus, 
@@ -15,6 +16,7 @@ import {
 import GenreModal from '@/components/GenreModal';
 
 export default function GenreManagerPage() {
+  const { openConfirmModal } = useWorkspaceStore();
   const [configs, setConfigs] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<any>(null);
@@ -29,11 +31,16 @@ export default function GenreManagerPage() {
     setConfigs(data);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this configuration? This will affect all books assigned to this genre.')) {
-      await deleteGenreConfig(id);
-      loadConfigs();
-    }
+  const handleDelete = async (id: string, name: string) => {
+    openConfirmModal({
+      title: "Delete Genre Rules",
+      message: `Are you sure you want to delete the "${name}" configuration? This will affect all books assigned to this genre.`,
+      confirmLabel: "Delete",
+      onConfirm: async () => {
+        await deleteGenreConfig(id);
+        loadConfigs();
+      }
+    });
   };
 
   const handleEdit = (config: any) => {
@@ -137,7 +144,7 @@ export default function GenreManagerPage() {
                         </button>
                         <button 
                           className={`btn btn-ghost btn-xs btn-square text-slate-400 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-slate-200`}
-                          onClick={() => handleDelete(config.id)}
+                          onClick={() => handleDelete(config.id, config.genreName)}
                           title="Delete"
                         >
                           <Trash2 size={12} />

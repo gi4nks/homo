@@ -1,18 +1,19 @@
 # HOMO 🏛️
 
-A professional Next.js 16 manuscript suite enabling authors to draft books chapter-by-chapter with context-aware LLM prompts and local SQLite persistence.
+A professional Next.js 16 manuscript suite enabling authors to craft books, essays, and technical content with context-aware AI assistance and immersive focus.
 
 ## 🚀 Key Features
 
-- **AI-Powered Drafting**: Real-time streaming generation using **Google Gemini 2.5 Flash** with reasoning capabilities.
-- **Inline AI Editor**: Notion-style bubble menu. Highlight text to "Improve", "Make Darker", or "Show, Don't Tell" with context-aware results.
-- **Centered Revision Modal**: Review and accept AI suggestions in a focused overlay before committing them to your manuscript.
-- **Immersive Focus Mode**: Enter a distraction-free writing environment with a single click or `Escape` key.
+- **AI-Powered Personas**: Select from specialized writing styles (e.g., The Dark Epic Poet, The Tech Evangelist, The Subtle Enhancer) or create your own custom AI personas.
+- **Context-Aware Drafting**: Real-time streaming generation using **Google Gemini 2.5 Flash** that understands your book's synopsis, chapter goals, and character cast.
+- **Inline AI Editor**: Highlight text to "Improve", "Make Darker", or "Show, Don't Tell". The AI performs context-aware rewrites based on your specific story bible.
+- **Immersive Focus Mode**: A distraction-free writing environment that centers your prose and hides all sidebars with a single click or `Escape`.
+- **Integrated Chapter View**: Click any chapter title to read all its scenes concatenated in a beautiful, chronological reading layout.
 - **Professional Three-Pane Workspace**:
-  - **Navigator (Left)**: Drag & Drop reordering with exclusive chapter expansion and active route highlighting.
-  - **Writing Canvas (Center)**: Centered layout with real-time word counting and power-user keyboard shortcuts.
-  - **Inspector (Right)**: Context-aware tabs for Book metadata, Chapter goals, and Scene casting.
-- **Intelligent Prompt Engine**: Hardened prompt assembly using XML delimiters to prevent injection while providing deep story context.
+  - **Navigator (Left)**: Drag & Drop reordering with exclusive chapter expansion.
+  - **Writing Canvas (Center)**: Minimalist TipTap editor with power-user keyboard shortcuts.
+  - **Inspector (Right)**: Collapsible accordion sections for granular metadata management.
+- **Prompt Blueprint**: Total transparency with a terminal-style view of the exact source instructions sent to the AI.
 
 ## 🛠️ Tech Stack
 
@@ -39,6 +40,7 @@ A professional Next.js 16 manuscript suite enabling authors to draft books chapt
 3. **Setup Database**:
    ```bash
    npx prisma db push
+   npx prisma generate
    ```
 
 4. **Run development server**:
@@ -54,6 +56,7 @@ A professional Next.js 16 manuscript suite enabling authors to draft books chapt
 
 ## 📐 Architecture
 
-- **URL-Driven State**: Book, Chapter, and Scene context are managed via dynamic routes for permanent linkability.
-- **Blueprint Peek**: View the exact source prompt sent to the AI via the "Instruction Blueprint" terminal view.
-- **Safe Sync**: Background autosaves use `startTransition` to maintain UI responsiveness and protect active streams.
+- **SSOT Prompt Factory**: Centralized logic in `lib/prompt-builder.ts` ensures consistent instructions across all generation tasks.
+- **URL-Driven State**: Permanent linkability for every Book, Chapter, and Scene.
+- **Safe Sync**: Uses React's `startTransition` for background autosaves to protect active AI streams.
+- **Custom Modals**: Replaces native browser dialogs with styled, themed confirmation overlays.

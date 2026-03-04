@@ -56,6 +56,7 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
   const params = useParams();
   const router = useRouter();
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
+  const openConfirmModal = useWorkspaceStore(state => state.openConfirmModal);
   const [isPending, startTransition] = useTransition();
   
   const isSelected = params.sceneId === scene.id;
@@ -91,7 +92,15 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
         </div>
         <div className="flex gap-0.5 opacity-0 group-hover/scene:opacity-100 transition-opacity shrink-0">
           <button className="btn btn-ghost btn-xs btn-square" onClick={(e) => { e.stopPropagation(); openMetadataModal('rename_scene', bookId, scene.id, scene.title, scene.sceneNumber); }}><Edit2 size={10} /></button>
-          <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { e.stopPropagation(); if(confirm(`Delete Scene "${scene.title}"?`)) startTransition(async () => { await deleteScene(scene.id); }); }}><Trash2 size={10} /></button>
+          <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { 
+            e.stopPropagation(); 
+            openConfirmModal({
+              title: "Delete Scene",
+              message: `Are you sure you want to delete "${scene.title}"? This action cannot be undone.`,
+              confirmLabel: "Delete",
+              onConfirm: () => startTransition(async () => { await deleteScene(scene.id); })
+            });
+          }}><Trash2 size={10} /></button>
         </div>
       </div>
     </li>
@@ -103,6 +112,7 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
   const params = useParams();
   const router = useRouter();
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
+  const openConfirmModal = useWorkspaceStore(state => state.openConfirmModal);
   const [isPending, startTransition] = useTransition();
   
   const isExpanded = expandedChapters.has(chapter.id);
@@ -165,7 +175,15 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
           <div className="flex gap-0.5 opacity-0 group-hover/chapter:opacity-100 transition-opacity shrink-0">
              <button className="btn btn-ghost btn-xs btn-square text-primary" onClick={(e) => { e.stopPropagation(); openMetadataModal('create_scene', bookId, chapter.id); }}><Plus size={14} /></button>
              <button className="btn btn-ghost btn-xs btn-square" onClick={(e) => { e.stopPropagation(); openMetadataModal('rename_chapter', bookId, chapter.id, chapter.title, chapter.chapterNumber); }}><Edit2 size={12} /></button>
-             <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { e.stopPropagation(); if(confirm(`Delete Chapter "${chapter.title}"?`)) startTransition(async () => { await deleteChapter(chapter.id); }); }}><Trash2 size={12} /></button>
+             <button className="btn btn-ghost btn-xs btn-square text-error" onClick={(e) => { 
+               e.stopPropagation(); 
+               openConfirmModal({
+                 title: "Delete Chapter",
+                 message: `Are you sure you want to delete "${chapter.title}"? All scenes within will also be removed.`,
+                 confirmLabel: "Delete",
+                 onConfirm: () => startTransition(async () => { await deleteChapter(chapter.id); })
+               });
+             }}><Trash2 size={12} /></button>
           </div>
         </div>
 

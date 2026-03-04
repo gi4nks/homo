@@ -27,7 +27,7 @@ export default function AiProposalBox({
 
   return (
     <div className={`m-4 mx-8 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-2xl transition-all duration-500 ease-in-out relative overflow-hidden flex flex-col ${
-      isExpanded ? 'flex-grow min-h-[60vh] mb-8' : 'h-auto'
+      isExpanded ? 'flex-grow min-h-[60vh] mb-8' : 'min-h-[300px] h-auto'
     }`}>
       {/* BACKGROUND DECORATION */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none -mr-32 -mt-32"></div>

@@ -2,7 +2,8 @@
 
 import React, { useState, useTransition, useRef } from 'react';
 import { generatePromptData } from '@/app/actions/ai.actions';
-import { Sparkles, Copy, Check, X, RefreshCw, AlertCircle, Zap } from 'lucide-react';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { Terminal, Copy, Check, X, RefreshCw, AlertCircle, Zap } from 'lucide-react';
 
 interface PromptGeneratorProps {
   bookId: string;
@@ -11,6 +12,7 @@ interface PromptGeneratorProps {
 
 const PromptGenerator: React.FC<PromptGeneratorProps> = ({ bookId, currentSceneId }) => {
   const modalRef = useRef<HTMLDialogElement>(null);
+  const activeAiProfileId = useWorkspaceStore(state => state.activeAiProfileId);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
@@ -23,7 +25,7 @@ const PromptGenerator: React.FC<PromptGeneratorProps> = ({ bookId, currentSceneI
     
     startTransition(async () => {
       try {
-        const generatedPrompt = await generatePromptData(bookId, currentSceneId);
+        const generatedPrompt = await generatePromptData(bookId, currentSceneId, activeAiProfileId || undefined);
         setPrompt(generatedPrompt);
       } catch (err) {
         setError('Failed to generate prompt. Please try again.');
@@ -46,13 +48,13 @@ const PromptGenerator: React.FC<PromptGeneratorProps> = ({ bookId, currentSceneI
 
   return (
     <>
-      {/* Primary Action Button (Header Context) */}
+      {/* Demoted Action Button (Technical Utility) */}
       <button 
-        className="btn btn-primary btn-sm rounded-md font-black uppercase tracking-widest text-[10px] gap-2 shadow-sm shadow-primary/20"
+        className="btn btn-ghost btn-sm rounded-md font-black uppercase tracking-widest text-[9px] gap-2 opacity-40 hover:opacity-100 hover:bg-base-200 transition-all border border-base-300/50"
         onClick={handleOpenAndGenerate}
       >
-        <Zap className="w-3.5 h-3.5 fill-current" /> 
-        Generate AI Prompt
+        <Terminal className="w-3.5 h-3.5" /> 
+        Prompt Preview
       </button>
 
       {/* Global Modal using Native Dialog for correct Z-Index/Stacking Context */}

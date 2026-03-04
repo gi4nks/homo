@@ -14,6 +14,7 @@ import {
 import Editor, { EditorRef } from './Editor';
 import { useAiStream } from '@/hooks/useAiStream';
 import AiProposalBox from './editor/AiProposalBox';
+import AiProfileSelector from './editor/AiProfileSelector';
 
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -34,6 +35,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const setSaveStatus = useWorkspaceStore(state => state.setSaveStatus);
   const isFocusMode = useWorkspaceStore(state => state.isFocusMode);
   const toggleFocusMode = useWorkspaceStore(state => state.toggleFocusMode);
+  const activeAiProfileId = useWorkspaceStore(state => state.activeAiProfileId);
 
   const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -206,6 +208,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             initialContent={content} 
             bookId={bookId}
             sceneId={sceneId}
+            activeAiProfileId={activeAiProfileId}
             onChange={handleContentChange} 
           />
         </div>
@@ -235,6 +238,9 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* AI PERSONA SELECTOR */}
+          {!isAiLoading && <AiProfileSelector />}
+
           {/* FOCUS MODE TOGGLE */}
           <button 
             type="button"
@@ -250,7 +256,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             className={`btn btn-xs gap-2 ${isAiLoading ? 'btn-disabled bg-base-300' : 'btn-primary shadow-lg shadow-primary/20 hover:scale-[1.02]'} transition-all px-4`}
             onMouseDown={(e) => { 
               e.preventDefault(); 
-              if (!isAiLoading && sceneId) startStream(bookId, sceneId); 
+              if (!isAiLoading && sceneId) startStream(bookId, sceneId, activeAiProfileId || undefined); 
             }}
             disabled={isAiLoading}
           >

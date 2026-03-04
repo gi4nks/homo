@@ -9,7 +9,7 @@ export function useAiStream() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [promptBlueprint, setPromptBlueprint] = useState<string | null>(null);
 
-  const startStream = useCallback(async (bookId: string, sceneId: string) => {
+  const startStream = useCallback(async (bookId: string, sceneId: string, profileId?: string) => {
     if (!sceneId || !bookId) return;
     
     setIsAiLoading(true);
@@ -18,15 +18,15 @@ export function useAiStream() {
     setPromptBlueprint(null);
 
     try {
-      // 1. Fetch the blueprint first for transparency
-      const blueprint = await generatePromptData(bookId, sceneId);
+      // 1. Fetch the blueprint first for transparency (NOW WITH PERSONA)
+      const blueprint = await generatePromptData(bookId, sceneId, profileId);
       setPromptBlueprint(blueprint);
 
-      // 2. Start the actual stream
+      // 2. Start the actual stream with optional profileId
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneId })
+        body: JSON.stringify({ sceneId, profileId })
       });
 
       if (!response.ok) {

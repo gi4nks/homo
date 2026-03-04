@@ -15,7 +15,7 @@ export const CreateBookSchema = z.object({
   title: z.string().min(1, "Title is required").max(255),
   genre: z.string().max(100).optional(),
   status: z.string().max(50).optional(),
-  tone: z.string().max(100).optional(),
+  tone: z.string().max(5000).optional(),
 });
 
 export const UpdateBookBibleSchema = z.object({
@@ -25,7 +25,7 @@ export const UpdateBookBibleSchema = z.object({
   synopsis: z.string().optional(),
   genreSpecificGoals: z.string().optional(),
   genreId: z.string().uuid().nullable().optional(),
-  tone: z.string().max(100).optional(),
+  tone: z.string().max(5000).optional(),
   status: z.string().max(50).optional(),
 });
 

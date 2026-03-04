@@ -24,6 +24,7 @@ interface EditorProps {
   initialContent: string;
   bookId: string;
   sceneId: string;
+  activeAiProfileId?: string | null;
   onChange: (content: string) => void;
 }
 
@@ -34,7 +35,7 @@ export interface EditorRef {
   insertContent: (content: string) => void;
 }
 
-const Editor = forwardRef<EditorRef, EditorProps>(({ initialContent, bookId, sceneId, onChange }, ref) => {
+const Editor = forwardRef<EditorRef, EditorProps>(({ initialContent, bookId, sceneId, activeAiProfileId, onChange }, ref) => {
   const [wordCount, setWordCount] = useState(0);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [inlineProposal, setInlineProposal] = useState<string | null>(null);
@@ -82,7 +83,13 @@ const Editor = forwardRef<EditorRef, EditorProps>(({ initialContent, bookId, sce
       const response = await fetch('/api/rewrite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedText, instruction, bookId, sceneId }),
+        body: JSON.stringify({ 
+          selectedText, 
+          instruction, 
+          bookId, 
+          sceneId,
+          profileId: activeAiProfileId || undefined 
+        }),
       });
 
       if (!response.ok) throw new Error('Rewrite failed');

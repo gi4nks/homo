@@ -79,3 +79,13 @@ model GenreConfig {
   updatedAt         DateTime @updatedAt
   books             Book[]   // Opposite relation field added here
 }
+
+model AiProfile {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  description  String?
+  systemPrompt String
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

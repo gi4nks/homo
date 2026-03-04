@@ -55,6 +55,29 @@ export default function SettingsHubPage() {
               </div>
             </Link>
 
+            {/* ACTIVE: AI Personas */}
+            <Link href="/settings/profiles" className="card bg-white border border-slate-200 shadow-sm hover:shadow-xl transition-all hover:border-indigo-500 group relative overflow-hidden rounded-xl h-full">
+              <div className="absolute top-0 right-0 p-4">
+                 <div className="badge badge-indigo-500 bg-indigo-500 text-white border-none badge-xs font-black uppercase tracking-widest text-[8px] py-2 px-3 shadow-md">Active</div>
+              </div>
+              <div className="card-body p-8 gap-6 flex flex-col h-full">
+                <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-inner">
+                  <Cpu size={28} />
+                </div>
+                <div className="flex-grow">
+                  <h3 className="font-black text-xl leading-tight mb-2 text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">AI Personas</h3>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                    Manage AI writing styles and behaviors. Create custom personas for different narrative requirements.
+                  </p>
+                </div>
+                <div className="card-actions justify-end mt-6 border-t border-slate-50 pt-4">
+                   <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                      Configure Module <ChevronRight size={14} />
+                   </div>
+                </div>
+              </div>
+            </Link>
+
             {/* UPCOMING: AI Models */}
             <div className="card bg-slate-100 border border-slate-200 opacity-60 grayscale group cursor-not-allowed rounded-xl">
               <div className="card-body p-8 gap-6">

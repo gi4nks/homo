@@ -2,6 +2,7 @@
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
 import { createBook, deleteBook } from '@/app/actions/book.actions';
+import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
@@ -33,6 +34,7 @@ const FormattedDate = ({ dateString }: { dateString: string }) => {
 
 export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
   const router = useRouter();
+  const openConfirmModal = useWorkspaceStore(state => state.openConfirmModal);
   const [isPending, startTransition] = useTransition();
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -144,7 +146,15 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
                     <div className="card-body p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div className={`badge ${getStatusClass(book.status)} badge-xs font-bold uppercase py-2`}>{book.status}</div>
-                        <button className="btn btn-ghost btn-xs btn-circle text-error opacity-0 group-hover:opacity-100 transition-opacity" onClick={async (e) => { e.preventDefault(); if (confirm('Delete?')) { await deleteBook(book.id); router.refresh(); } }}><Trash2 size={14} /></button>
+                        <button className="btn btn-ghost btn-xs btn-circle text-error opacity-0 group-hover:opacity-100 transition-opacity" onClick={async (e) => { 
+                          e.preventDefault(); 
+                          openConfirmModal({
+                            title: "Delete Manuscript",
+                            message: `Are you sure you want to delete "${book.title}"? This will permanently remove all chapters and scenes.`,
+                            confirmLabel: "Delete",
+                            onConfirm: async () => { await deleteBook(book.id); router.refresh(); }
+                          });
+                        }}><Trash2 size={14} /></button>
                       </div>
                       <Link href={`/book/${book.id}`} className="hover:text-primary transition-colors">
                         <h3 className="font-black text-lg uppercase tracking-tight line-clamp-2 leading-tight h-12 mb-1">{book.title}</h3>
@@ -185,7 +195,15 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
                               <td className="text-center opacity-70 font-bold">{totalChapters} ch / {totalScenes} sc</td>
                               <td className="text-right font-mono text-secondary font-bold">{totalWords.toLocaleString()} <span className="text-[9px] opacity-40 uppercase font-sans">w</span></td>
                               <td className="text-right text-[10px] font-bold opacity-40 uppercase pr-8"><div className="flex items-center justify-end gap-2"><Calendar size={12} /><FormattedDate dateString={book.updatedAt} /></div></td>
-                              <td className="text-right pr-4"><button className="btn btn-ghost btn-xs btn-square text-error opacity-0 group-hover:opacity-100" onClick={async (e) => { e.preventDefault(); if (confirm('Delete?')) { await deleteBook(book.id); router.refresh(); } }}><Trash2 size={12} /></button></td>
+                              <td className="text-right pr-4"><button className="btn btn-ghost btn-xs btn-square text-error opacity-0 group-hover:opacity-100" onClick={async (e) => { 
+                                e.preventDefault(); 
+                                openConfirmModal({
+                                  title: "Delete Manuscript",
+                                  message: `Are you sure you want to delete "${book.title}"? This will permanently remove all chapters and scenes.`,
+                                  confirmLabel: "Delete",
+                                  onConfirm: async () => { await deleteBook(book.id); router.refresh(); }
+                                });
+                              }}><Trash2 size={12} /></button></td>
                            </tr>
                         );
                      })}
