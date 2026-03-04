@@ -4,9 +4,8 @@ import React, { useState, useEffect, useTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useParams } from 'next/navigation';
 import { updateScenePromptGoals, toggleCharacterInScene } from '@/app/actions/scene.actions';
-import { Sparkles, Users, RefreshCw } from 'lucide-react';
+import { Sparkles, Users, RefreshCw, Target } from 'lucide-react';
 
-// Custom debounce hook internal to tab for performance
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -22,88 +21,76 @@ export default function SceneTab({ book }: { book: any }) {
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
   const [isPending, startTransition] = useTransition();
 
-  // Find current scene from prop
   const scene = book.chapters
-    .flatMap((c: any) => c.scenes)
+    .flatMap((ch: any) => ch.scenes)
     .find((s: any) => s.id === activeSceneId);
 
   const [localGoals, setLocalSceneGoals] = useState(scene?.promptGoals || '');
   const debouncedGoals = useDebounce(localGoals, 1500);
 
-  // Sync local state when scene changes
   useEffect(() => {
-    if (scene) setLocalSceneGoals(scene.promptGoals || '');
-  }, [activeSceneId, scene?.promptGoals]);
-
-  // Auto-save logic
-  useEffect(() => {
-    if (!activeSceneId || debouncedGoals === (scene?.promptGoals || '')) return;
-
-    const save = async () => {
+    if (debouncedGoals !== (scene?.promptGoals || '')) {
+      if (!activeSceneId) return;
       setSaveStatus(true, null);
-      const res = await updateScenePromptGoals(activeSceneId, debouncedGoals);
-      if (res.success) {
-        setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      } else {
-        setSaveStatus(false, "Error");
-      }
-    };
-    save();
-  }, [debouncedGoals]);
+      startTransition(async () => {
+        const res = await updateScenePromptGoals(activeSceneId, debouncedGoals);
+        setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
+      });
+    }
+  }, [debouncedGoals, activeSceneId, setSaveStatus, scene?.promptGoals]);
 
-  if (!activeSceneId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 opacity-30 gap-4">
-        <Sparkles size={40} />
-        <p className="text-xs font-bold uppercase tracking-widest text-center px-8">
-          Select a scene in the sidebar to view its goals and cast
-        </p>
-      </div>
-    );
-  }
+  if (!activeSceneId) return null;
 
   return (
-    <div className="p-4 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {/* SCENE CASTING */}
-      <section className="space-y-4">
-        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+    <div className="p-4 space-y-3 animate-in fade-in slide-in-from-right-2 duration-300">
+      
+      {/* SECTION: SCENE CAST */}
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-secondary">
           <Users size={12} /> Scene Cast
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {book.charactersList?.map((char: any) => {
-            const isPresent = scene?.characters?.some((c: any) => c.id === char.id);
-            return (
-              <button 
-                key={char.id} 
-                onClick={async () => {
-                  setSaveStatus(true, null);
-                  const res = await toggleCharacterInScene(activeSceneId, char.id);
-                  setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
-                }} 
-                className={`badge badge-sm py-3.5 px-4 font-black uppercase text-[9px] tracking-widest border transition-all ${
-                  isPresent ? 'badge-primary border-primary shadow-md' : 'badge-ghost border-base-300 opacity-40 hover:opacity-100'
-                }`}
-              >
-                {char.name}
-              </button>
-            );
-          })}
+        </summary>
+        <div className="collapse-content space-y-3">
+          <div className="flex flex-wrap gap-2 pt-2">
+            {book.charactersList?.map((char: any) => {
+              const isSelected = scene?.characters.some((sc: any) => sc.id === char.id);
+              return (
+                <button
+                  key={char.id}
+                  onClick={() => toggleCharacterInScene(activeSceneId, char.id)}
+                  className={`btn btn-xs rounded-full px-3 border transition-all ${
+                    isSelected ? 'btn-secondary border-secondary shadow-md' : 'btn-ghost border-base-300 opacity-50 grayscale hover:grayscale-0'
+                  }`}
+                >
+                  {char.name}
+                </button>
+              );
+            })}
+          </div>
+          {(!book.charactersList || book.charactersList.length === 0) && (
+            <p className="text-[10px] opacity-40 italic py-2">No characters defined in Book Tab.</p>
+          )}
         </div>
-      </section>
+      </details>
 
-      {/* IMMEDIATE ACTION */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Immediate Action (Beats)</h4>
-          {isPending && <RefreshCw size={10} className="animate-spin opacity-30" />}
+      {/* SECTION: IMMEDIATE ACTION */}
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+          <Sparkles size={12} /> Immediate Action (Beats)
+        </summary>
+        <div className="collapse-content pt-2">
+          <textarea 
+            className="textarea textarea-ghost w-full min-h-[250px] text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0 resize-none custom-scrollbar" 
+            placeholder="Describe exactly what happens in this scene for the AI..." 
+            value={localGoals} 
+            onChange={(e) => setLocalSceneGoals(e.target.value)} 
+          />
+          <div className="flex justify-end gap-2 mt-2 opacity-20">
+             <RefreshCw size={10} className={isPending ? 'animate-spin' : ''} />
+             <span className="text-[8px] font-black uppercase tracking-tighter">Auto-syncing Context</span>
+          </div>
         </div>
-        <textarea 
-          className="textarea textarea-bordered w-full h-80 text-[11px] leading-relaxed p-6 font-medium focus:border-primary bg-base-50 shadow-inner resize-none border-base-300" 
-          placeholder="Describe exactly what happens in this scene..." 
-          value={localGoals} 
-          onChange={(e) => setLocalSceneGoals(e.target.value)} 
-        />
-      </section>
+      </details>
+
     </div>
   );
 }

@@ -227,7 +227,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             <span>Scene: <span className="text-base-content font-mono tracking-tighter text-[11px]">{wordCount.toLocaleString()}</span> Words</span>
           </div>
           <div className="divider divider-horizontal mx-0 h-4 opacity-20"></div>
-          <span className="opacity-40">Style: Manuscript Pro</span>
+          <span className="opacity-40">Writing Mode: Professional</span>
         </div>
 
         <div className="hidden lg:block text-[9px] font-bold opacity-20 uppercase tracking-[0.3em]">

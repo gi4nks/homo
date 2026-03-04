@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useParams } from 'next/navigation';
 import { updateChapter } from '@/app/actions/chapter.actions';
-import { Layers, RefreshCw } from 'lucide-react';
+import { Layers, RefreshCw, Target } from 'lucide-react';
 
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -20,50 +20,43 @@ export default function ChapterTab({ book }: { book: any }) {
   const activeChapterId = params.chapterId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
 
-  // Find chapter from book prop
   const chapter = book.chapters.find((c: any) => c.id === activeChapterId);
   const [localGoal, setLocalGoal] = useState(chapter?.chapterGoal || '');
   const debouncedGoal = useDebounce(localGoal, 1500);
 
   useEffect(() => {
-    if (chapter) setLocalGoal(chapter.chapterGoal || '');
-  }, [activeChapterId, chapter?.chapterGoal]);
-
-  useEffect(() => {
-    if (!activeChapterId || debouncedGoal === (chapter?.chapterGoal || '')) return;
-
-    const save = async () => {
+    if (debouncedGoal !== (chapter?.chapterGoal || '')) {
+      if (!activeChapterId) return;
       setSaveStatus(true, null);
-      const res = await updateChapter(activeChapterId, { chapterGoal: debouncedGoal });
-      if (res.success) {
+      updateChapter(activeChapterId, { chapterGoal: debouncedGoal }).then(() => {
         setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      } else {
-        setSaveStatus(false, "Error");
-      }
-    };
-    save();
-  }, [debouncedGoal]);
+      });
+    }
+  }, [debouncedGoal, activeChapterId, setSaveStatus, chapter?.chapterGoal]);
 
-  if (!activeChapterId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 opacity-30 gap-4">
-        <Layers size={40} />
-        <p className="text-xs font-bold uppercase tracking-widest">Select a chapter to view its goals</p>
-      </div>
-    );
-  }
+  if (!activeChapterId) return null;
 
   return (
-    <div className="p-4 space-y-4 animate-in fade-in duration-300">
-      <section className="space-y-3">
-        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Chapter Arc / Goals</h4>
-        <textarea 
-          className="textarea textarea-bordered w-full h-[500px] text-[11px] leading-relaxed p-6 font-medium focus:border-primary bg-base-50 shadow-inner resize-none border-base-300" 
-          placeholder="What is the overarching goal of this chapter?" 
-          value={localGoal} 
-          onChange={(e) => setLocalGoal(e.target.value)} 
-        />
-      </section>
+    <div className="p-4 space-y-3 animate-in fade-in slide-in-from-right-2 duration-300">
+      
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+          <Target size={12} /> Overarching Chapter Goal
+        </summary>
+        <div className="collapse-content pt-2">
+          <textarea 
+            className="textarea textarea-ghost w-full min-h-[200px] text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0 resize-none custom-scrollbar" 
+            placeholder="What is the main objective or arc of this chapter?" 
+            value={localGoal} 
+            onChange={(e) => setLocalGoal(e.target.value)} 
+          />
+          <div className="flex justify-end gap-2 mt-2 opacity-20">
+             <RefreshCw size={10} />
+             <span className="text-[8px] font-black uppercase tracking-tighter">Syncing Chapter Context</span>
+          </div>
+        </div>
+      </details>
+
     </div>
   );
 }

@@ -25,7 +25,6 @@ export default function BookTab({ book }: { book: any }) {
   const [genres, setGenres] = useState<any[]>([]);
   const [isPending, startTransition] = useTransition();
 
-  // Character Modal State
   const [isCharModalOpen, setIsCharModalOpen] = useState(false);
   const [charToEdit, setCharToEdit] = useState<any>(null);
 
@@ -36,11 +35,7 @@ export default function BookTab({ book }: { book: any }) {
   const debouncedTone = useDebounce(localTone, 1500);
 
   useEffect(() => {
-    const load = async () => {
-      const data = await getGenreConfigs();
-      setGenres(data);
-    };
-    load();
+    getGenreConfigs().then(setGenres);
   }, []);
 
   const saveField = async (data: any) => {
@@ -66,62 +61,59 @@ export default function BookTab({ book }: { book: any }) {
   };
 
   return (
-    <div className="p-4 space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+    <div className="p-4 space-y-3 animate-in fade-in slide-in-from-left-2 duration-300">
+      
       {/* GENRE SELECTION */}
-      <div className="bg-base-200/50 p-4 rounded-lg border border-base-300 space-y-3 shadow-inner">
-        <label className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-2 text-primary">
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
           <Tags size={12} /> Literary Genre
-        </label>
-        <select 
-          className="select select-bordered select-sm w-full font-bold bg-base-100"
-          value={book.genreId || ""}
-          onChange={(e) => {
-            const val = e.target.value || null;
-            saveField({ genreId: val });
-          }}
-        >
-          <option value="">None / Manual</option>
-          {genres.map(g => (<option key={g.id} value={g.id}>{g.genreName}</option>))}
-        </select>
-      </div>
-
-      {/* SYNOPSIS ACCORDION */}
-      <div className="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-lg">
-        <input type="radio" name="book-accordion" defaultChecked /> 
-        <div className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-          <BookOpen size={12} /> Synopsis
+        </summary>
+        <div className="collapse-content pt-2">
+          <select 
+            className="select select-bordered select-sm w-full font-bold bg-base-100"
+            value={book.genreId || ""}
+            onChange={(e) => saveField({ genreId: e.target.value || null })}
+          >
+            <option value="">None / Manual</option>
+            {genres.map(g => (<option key={g.id} value={g.id}>{g.genreName}</option>))}
+          </select>
         </div>
-        <div className="collapse-content"> 
+      </details>
+
+      {/* SYNOPSIS */}
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-base-content">
+          <BookOpen size={12} /> Synopsis
+        </summary>
+        <div className="collapse-content pt-2">
           <textarea 
-            className="textarea textarea-ghost w-full h-48 text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0" 
+            className="textarea textarea-ghost w-full min-h-[150px] text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0 resize-none custom-scrollbar" 
             value={localSynopsis} 
             onChange={(e) => setLocalSynopsis(e.target.value)} 
           />
         </div>
-      </div>
+      </details>
 
-      {/* TONE ACCORDION */}
-      <div className="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-lg">
-        <input type="radio" name="book-accordion" /> 
-        <div className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+      {/* TONE & STYLE */}
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm">
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
           <Sparkles size={12} /> Tone & Style
-        </div>
-        <div className="collapse-content"> 
+        </summary>
+        <div className="collapse-content pt-2">
           <textarea 
-            className="textarea textarea-ghost w-full h-32 text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0" 
+            className="textarea textarea-ghost w-full min-h-[100px] text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0 resize-none custom-scrollbar" 
             value={localTone} 
             onChange={(e) => setLocalTone(e.target.value)} 
             placeholder="Noir, academic, poetic..." 
           />
         </div>
-      </div>
+      </details>
 
-      {/* CHARACTERS ACCORDION */}
-      <div className="collapse collapse-arrow bg-base-200/50 border border-base-300 rounded-lg">
-        <input type="radio" name="book-accordion" /> 
-        <div className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-secondary">
+      {/* MASTER CHARACTERS */}
+      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm">
+        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-secondary">
           <Wand2 size={12} /> Master Characters
-        </div>
+        </summary>
         <div className="collapse-content space-y-4 pt-2"> 
           <button 
             onClick={() => { setCharToEdit(null); setIsCharModalOpen(true); }} 
@@ -133,7 +125,7 @@ export default function BookTab({ book }: { book: any }) {
             {book.charactersList?.map((char: any) => (
               <div key={char.id} className="p-3 bg-base-100 rounded-md border border-base-300 shadow-sm flex items-center justify-between group">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] font-black uppercase tracking-tight text-slate-900 truncate">{char.name}</span>
+                  <span className="text-[10px] font-black uppercase tracking-tight truncate">{char.name}</span>
                   {char.role && <span className="text-[8px] font-bold uppercase opacity-40 truncate">{char.role}</span>}
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -148,9 +140,8 @@ export default function BookTab({ book }: { book: any }) {
             ))}
           </div>
         </div>
-      </div>
+      </details>
 
-      {/* CHARACTER MODAL INTEGRATION */}
       {activeBookId && (
         <CharacterModal 
           isOpen={isCharModalOpen} 
