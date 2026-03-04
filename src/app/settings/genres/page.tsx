@@ -159,7 +159,7 @@ export default function GenreManagerPage() {
       />
 
       <footer className="p-4 bg-white border-t border-slate-200 text-center z-20">
-        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">Architect Rule Engine v2.3</p>
+        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">HOMO Rule Engine v2.3</p>
       </footer>
     </main>
   );

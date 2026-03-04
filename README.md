@@ -1,4 +1,4 @@
-# Novel AI Architect 🏛️
+# HOMO 🏛️
 
 A professional Next.js 16 manuscript suite enabling authors to draft books chapter-by-chapter with context-aware LLM prompts and local SQLite persistence.
 

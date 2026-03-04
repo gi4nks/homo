@@ -124,12 +124,12 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
     <li ref={setNodeRef} style={style} className={`w-full list-none ${isDragging ? 'opacity-50' : ''}`}>
       <div className="flex flex-col w-full p-0">
         <div 
-          onClick={() => router.push(`/book/${bookId}/chapter/${chapter.id}`)}
           className={`flex items-start gap-2 w-full p-2.5 rounded-xl group/chapter cursor-pointer border transition-all ${
             isChapterActive 
               ? 'bg-base-200 border-base-300 text-primary font-black shadow-inner' 
               : 'border-transparent hover:bg-base-200 text-base-content/80 font-bold'
           }`}
+          onClick={() => router.push(`/book/${bookId}/chapter/${chapter.id}`)}
         >
           <div {...attributes} {...listeners} className="mt-1.5 cursor-grab active:cursor-grabbing opacity-0 group-hover/chapter:opacity-30" onClick={(e) => e.stopPropagation()}>
             <GripVertical size={14} />

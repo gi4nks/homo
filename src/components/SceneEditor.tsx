@@ -231,7 +231,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
         </div>
 
         <div className="hidden lg:block text-[9px] font-bold opacity-20 uppercase tracking-[0.3em]">
-          Engine v2.3 / Drafting Mode
+          HOMO Engine v2.3 / Drafting Mode
         </div>
 
         <div className="flex items-center gap-3">

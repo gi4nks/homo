@@ -1,7 +1,7 @@
-# Novel AI Architect - Engineering Manifest
+# HOMO - Engineering Manifest
 
 ## 🎯 Project Overview
-"Novel AI Architect" is a specialized drafting tool for authors. It prioritizes structure, context, and a distraction-free writing experience. The app uses a hierarchical data model (Book -> Chapter -> Scene) to provide LLMs with precise context for generating high-quality drafting prompts.
+"HOMO" is a specialized drafting tool for authors. It prioritizes structure, context, and a distraction-free writing experience. The app uses a hierarchical data model (Book -> Chapter -> Scene) to provide LLMs with precise context for generating high-quality drafting prompts.
 
 ## 🛠️ Tech Stack & Constraints
 - **Framework**: Next.js 16 (App Router) + React 19.

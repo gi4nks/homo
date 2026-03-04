@@ -92,7 +92,7 @@ export default function GlobalHeader() {
       {/* LEFT */}
       <div className="navbar-start gap-4 flex-grow-0">
         <Link href="/" className="btn btn-ghost p-0 hover:bg-transparent flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary text-primary-content rounded-lg flex items-center justify-center font-black shadow-lg">NA</div>
+          <div className="w-8 h-8 bg-primary text-primary-content rounded-lg flex items-center justify-center font-black shadow-lg">H</div>
         </Link>
 
         {isBookWorkspace && (

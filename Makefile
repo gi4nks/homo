@@ -1,4 +1,4 @@
-# Makefile for Novel AI Architect (Next.js Project)
+# Makefile for HOMO (Next.js Project)
 
 .PHONY: help install dev build start lint clean db-migrate db-generate db-studio
 

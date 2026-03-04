@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Novel AI Architect",
-  description: "Write your book chapter-by-chapter with LLM assistance",
+  title: "HOMO | Dark Epic Fantasy Writing Engine",
+  description: "The ultimate dark epic fantasy writing engine. Craft your manuscript with context-aware AI assistance and immersive focus.",
 };
 
 export default function RootLayout({
