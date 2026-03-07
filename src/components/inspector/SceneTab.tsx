@@ -110,23 +110,19 @@ export default function SceneTab({ book }: { book: any }) {
     }
   }, [activeSceneId, scene?.promptGoals, scene?.narrativePosition]);
 
-  useEffect(() => {
-    const hasChanged = debouncedGoals !== (scene?.promptGoals || '');
-    if (!debouncedGoals && !isDirtyRef.current) return;
+  const savePromptGoals = async (val: string) => {
+    if (!activeSceneId || isLocked || val === scene?.promptGoals) return;
+    setSaveStatus(true, null);
+    const res = await updateScenePromptGoals(activeSceneId, val);
+    setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
+    if (res.success) isDirtyRef.current = false;
+  };
 
-    if (isDirtyRef.current && hasChanged && activeSceneId && !isLocked) {
-      setSaveStatus(true, null);
-      startTransition(async () => {
-        const res = await updateScenePromptGoals(activeSceneId, debouncedGoals);
-        if (res.success) {
-          setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-          isDirtyRef.current = false;
-        } else {
-          setSaveStatus(false, "Sync Error");
-        }
-      });
+  useEffect(() => {
+    if (isDirtyRef.current && debouncedGoals !== (scene?.promptGoals || '') && !isLocked) {
+      savePromptGoals(debouncedGoals);
     }
-  }, [debouncedGoals, activeSceneId, setSaveStatus, scene?.promptGoals, isLocked]);
+  }, [debouncedGoals, activeSceneId, isLocked, scene?.promptGoals]);
 
   const handleNarrativePositionChange = async (val: string) => {
     if (isLocked) return;
@@ -288,6 +284,7 @@ export default function SceneTab({ book }: { book: any }) {
               isDirtyRef.current = true;
               setLocalSceneGoals(e.target.value);
             }} 
+            onBlur={() => savePromptGoals(localGoals)}
             disabled={isLocked}
           />
           {!isLocked && (

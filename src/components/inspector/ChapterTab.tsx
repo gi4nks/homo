@@ -47,6 +47,12 @@ export default function ChapterTab({ book }: { book: any }) {
 
   const saveField = async (data: any) => {
     if (!activeChapterId) return;
+    
+    // Check if data actually changed
+    const keys = Object.keys(data);
+    const hasChanged = keys.some(key => data[key] !== chapter[key]);
+    if (!hasChanged) return;
+
     setSaveStatus(true, null);
     const res = await updateChapter(activeChapterId, data);
     setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
@@ -92,6 +98,7 @@ export default function ChapterTab({ book }: { book: any }) {
             className={inputClass}
             value={localTitle}
             onChange={(e) => setLocalTitle(e.target.value)}
+            onBlur={() => saveField({ title: localTitle })}
             placeholder="Chapter Title..." 
           />
         </div>
@@ -106,6 +113,7 @@ export default function ChapterTab({ book }: { book: any }) {
             className={textareaClass}
             value={localGoal} 
             onChange={(e) => setLocalGoal(e.target.value)} 
+            onBlur={() => saveField({ chapterGoal: localGoal })}
             placeholder="What is the main goal or arc of this chapter?"
           />
         </div>

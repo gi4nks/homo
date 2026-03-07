@@ -1,17 +1,17 @@
-# HOMO 🏛️ v2.4.0
+# HOMO 🏛️ v2.6.0
 
 A professional Next.js 16 manuscript suite enabling authors to craft books, essays, and technical content with context-aware AI assistance and immersive focus.
 
 ## 🚀 Key Features
 
+- **Unified AI Engine**: Drafting and targeted revisions share a single, elegant streaming UI. Use **Cmd+J** on selected text for surgical edits or the Footer for creative expansion.
+- **Precision AI Replacement**: Targeted AI edits now use absolute document coordinates to perfectly overwrite selections, even after the UI is closed.
+- **Hardened Metadata Sync**: All fields in the Inspector (Global Synopsis, Character Cast, Scene Beats) feature debounced auto-save and `onBlur` force-sync to the database.
+- **Global Cast Management**: Centralized character management in the Book tab serves as the source of truth for scene-level character tracking.
+- **Scene Locking & Protection**: Finalize your prose by locking scenes to prevent accidental edits or AI overwrites, with an elegant "Faded Ink" archival sidebar aesthetic.
 - **Multi-Engine Support**: Seamlessly switch between **Google Gemini**, **Anthropic Claude**, and **OpenAI GPT** models directly from the editor footer.
-- **Scene Locking & Protection**: Finalize your prose by locking scenes to prevent accidental edits or AI overwrites.
-- **Faded Ink Sidebar**: A refined archival aesthetic for the sidebar where finished chapters and scenes visually recede in muted slate tones.
-- **Context-Aware Drafting**: Real-time streaming generation that understands your book's synopsis, authorial intent, lore constraints, and scene-specific goals.
-- **Inline AI Editor**: Refined floating bubble menu with contextual actions (Migliora, Più Crudo, Riassumi) and custom AI commands.
 - **Version History (Snapshots)**: Automatic version capture before every AI action, with side-by-side diff viewing and easy restoration.
 - **Ultra-Dense Focus Mode**: A distraction-free environment maximized for text density, centering your prose while providing quick access to essential AI controls.
-- **DaisyUI 5 (Fantasy Theme)**: A beautiful, themeable UI with a specialized "Fantasy" aesthetic optimized for creative flow.
 
 ## 🛠️ Tech Stack
 
@@ -51,13 +51,13 @@ A professional Next.js 16 manuscript suite enabling authors to craft books, essa
 ## ⌨️ Keyboard Shortcuts
 
 - **`Cmd/Ctrl + Enter`**: Trigger AI Scene Generation.
-- **`Cmd/Ctrl + J`**: Open AI Command Bar.
+- **`Cmd/Ctrl + J`**: Open AI Command Bar for selected text.
 - **`Escape`**: Toggle Focus Mode.
 - **`Cmd/Ctrl + Z / Y`**: Undo/Redo within the editor.
 
 ## 📐 Architecture
 
 - **SSOT Prompt Factory**: Centralized logic in `lib/prompt-builder.ts` ensures consistent instructions across all generation tasks.
-- **Hardened UI Sync**: Zustand-first state management ensures the sidebar, editor, and inspector are always perfectly aligned.
-- **Non-Destructive Locking**: Protections are applied at the container level to prevent TipTap reset bugs and data loss.
+- **Synchronous Context**: Uses `liveContent` injection from client refs to bypass database latency and ensure the AI always sees the absolute latest text.
+- **Precision Replacement**: Uses `insertContentAt` with persistent range tracking to solve the "Selection Clearing" bug in TipTap.
 - **Flexible Layout**: A strict flexbox hierarchy ensures zero UI overlap and internal scrolling for long-form content.

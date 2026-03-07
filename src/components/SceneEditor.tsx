@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, startTransition } from 'react';
+import React, { useState, useEffect, useRef, startTransition, useCallback } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { updateSceneContent, getSceneById, updateScene } from '@/app/actions/scene.actions';
 import { updateAppSettings, getPromptTemplates } from '@/app/actions/ai.actions';
@@ -40,15 +40,6 @@ const AI_MODELS = [
   ]}
 ];
 
-function useDebounce(value: string, delay: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debouncedValue;
-}
-
 interface SceneEditorProps {
   bookId: string;
   sceneId: string;
@@ -71,15 +62,15 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const storeScene = chapters.flatMap(c => c.scenes).find(s => s.id === sceneId);
   const isLocked = storeScene?.isLocked || false;
 
-  const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [wordCount, setWordCount] = useState(0);
   const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
   
   const editorRef = useRef<EditorRef>(null);
-  const contentRef = useRef<string>('');
-  const lastSavedRef = useRef<string>('');
-  const sceneIdRef = useRef<string | null>(null);
+  const lastSavedContentRef = useRef<string>('');
+  
+  // TRACKS IF AI IS REPLACING SELECTION OR APPENDING
+  const aiActionContextRef = useRef<{ mode: 'APPEND' | 'REPLACE', range?: { from: number, to: number } }>({ mode: 'APPEND' });
 
   const { aiProposal, isAiLoading, aiError, promptBlueprint, startStream, clearProposal } = useAiStream();
 
@@ -87,16 +78,59 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     getPromptTemplates().then(setPromptTemplates);
   }, []);
 
+  const persistToDb = useCallback(async (content: string) => {
+    if (!sceneId || content === lastSavedContentRef.current) return;
+    setSaveStatus(true, null);
+    try {
+      const res = await updateSceneContent(sceneId, content);
+      if (res.success && res.data) {
+        lastSavedContentRef.current = content;
+        setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        setUnsavedChanges(false);
+        updateSceneWordCount(sceneId, res.data.wordCount);
+      } else setSaveStatus(false, "Sync Error");
+    } catch (err) { setSaveStatus(false, "Error"); }
+  }, [sceneId, setSaveStatus, setUnsavedChanges, updateSceneWordCount]);
+
+  // --- UNIFIED AI ACTION TRIGGER ---
+  const handleAiAction = useCallback(async (instruction: string, selectedText?: string, range?: { from: number, to: number }) => {
+    if (!sceneId || isLocked || isAiLoading) return;
+
+    // 1. Determine Mode and Store Range
+    aiActionContextRef.current = { 
+      mode: selectedText ? 'REPLACE' : 'APPEND',
+      range: range 
+    };
+
+    // 2. Force Sync
+    const liveContent = await editorRef.current?.forceSave();
+    if (liveContent === undefined) return;
+
+    // 3. Snapshot
+    createSnapshot(sceneId, liveContent, selectedText ? "Auto: Pre-Rewrite" : "Auto: Pre-AI");
+
+    // 4. Stream
+    const targetTemplate = overridePromptTemplateId || activePromptTemplateId || DEFAULT_DRAFTING_TEMPLATE_ID;
+    startStream(
+      bookId, 
+      sceneId, 
+      overrideAiProfileId || activeAiProfileId || undefined, 
+      targetTemplate, 
+      instruction, 
+      selectedText ? 'REWRITE' : 'DRAFT',
+      undefined, 
+      undefined, 
+      liveContent,
+      selectedText
+    );
+  }, [sceneId, bookId, isLocked, isAiLoading, overridePromptTemplateId, activePromptTemplateId, overrideAiProfileId, activeAiProfileId, startStream]);
+
   // --- KEYBOARD SHORTCUTS ---
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (!isAiLoading && sceneId && !isLocked) {
-          const targetTemplate = overridePromptTemplateId || activePromptTemplateId || DEFAULT_DRAFTING_TEMPLATE_ID;
-          createSnapshot(sceneId, contentRef.current, "Auto: Pre-AI");
-          startStream(bookId, sceneId, overrideAiProfileId || activeAiProfileId || undefined, targetTemplate);
-        }
+        handleAiAction("Continue writing the scene.");
       }
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -105,29 +139,21 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [bookId, sceneId, isAiLoading, isLocked, startStream, toggleFocusMode, overridePromptTemplateId, activePromptTemplateId, overrideAiProfileId, activeAiProfileId]);
+  }, [handleAiAction, toggleFocusMode]);
 
   const handleQuickSwitchModel = async (newModel: string) => {
     if (isLocked) return;
     let provider = 'GOOGLE';
     if (newModel.startsWith('claude')) provider = 'ANTHROPIC';
     else if (newModel.startsWith('gpt') || newModel.startsWith('o1')) provider = 'OPENAI';
-
     setAiEngine(provider, newModel);
     await updateAppSettings({ activeProvider: provider as any, activeModelName: newModel });
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
   };
 
   const handleScenePromptTemplateChange = async (id: string | null) => {
     if (!sceneId || isLocked) return;
-    const val = id || null;
-    setActivePromptTemplateId(val);
-    await updateScene(sceneId, { defaultPromptTemplateId: val });
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
+    setActivePromptTemplateId(id);
+    await updateScene(sceneId, { defaultPromptTemplateId: id });
   };
 
   const calculateWords = (html: string) => {
@@ -139,53 +165,21 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   useEffect(() => {
     if (sceneId) {
       setIsLoading(true);
-      setContent(null);
-      sceneIdRef.current = sceneId;
-      const load = async () => {
-        const res = await getSceneById(sceneId);
+      getSceneById(sceneId).then(res => {
         if (res.success && res.data) {
-          const scene = res.data;
-          const initialContent = scene.content || '';
-          setContent(initialContent);
-          contentRef.current = initialContent;
-          lastSavedRef.current = initialContent;
-          const initialWordCount = calculateWords(initialContent);
+          lastSavedContentRef.current = res.data.content || '';
+          const initialWordCount = calculateWords(res.data.content || '');
           setWordCount(initialWordCount);
           if (sceneId) updateSceneWordCount(sceneId, initialWordCount);
-          setSaveStatus(false, new Date(scene.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          setSaveStatus(false, new Date(res.data.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
         setIsLoading(false);
-      };
-      load();
+      });
     }
   }, [sceneId, setSaveStatus, updateSceneWordCount]);
 
-  const debouncedContent = useDebounce(content || '', 1500);
-  useEffect(() => {
-    if (isAiLoading || isLocked) return;
-    const performSave = async () => {
-      if (sceneId && debouncedContent !== lastSavedRef.current && !isLoading) {
-        setSaveStatus(true, null);
-        startTransition(async () => {
-          try {
-            const res = await updateSceneContent(sceneId, debouncedContent);
-            if (res.success && res.data) {
-              lastSavedRef.current = debouncedContent;
-              setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-              setUnsavedChanges(false);
-              updateSceneWordCount(sceneId, res.data.wordCount);
-            } else setSaveStatus(false, "Sync Error");
-          } catch (err) { setSaveStatus(false, "Error"); }
-        });
-      }
-    };
-    performSave();
-  }, [debouncedContent, sceneId, setUnsavedChanges, isLoading, setSaveStatus, isAiLoading, isLocked, updateSceneWordCount]);
-
   const handleContentChange = (newContent: string) => {
     if (isLocked) return;
-    setContent(newContent);
-    contentRef.current = newContent;
     setUnsavedChanges(true);
     const newWordCount = calculateWords(newContent);
     setWordCount(newWordCount);
@@ -209,7 +203,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     </div>
   );
 
-  if (isLoading || content === null) return (
+  if (isLoading) return (
     <div className="h-full flex flex-col items-center justify-center bg-base-100 rounded-2xl">
       <Loader2 className="w-6 h-6 animate-spin text-primary opacity-20" />
     </div>
@@ -222,13 +216,15 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
           <Editor 
             ref={editorRef} 
             key={sceneId} 
-            initialContent={content} 
+            initialContent={lastSavedContentRef.current} 
             bookId={bookId}
             sceneId={sceneId}
             activeAiProfileId={activeAiProfileId}
             activePromptTemplateId={activePromptTemplateId}
             isLocked={isLocked}
             onChange={handleContentChange} 
+            onManualSave={persistToDb}
+            onAiAction={handleAiAction} 
           />
         </div>
 
@@ -237,21 +233,17 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
           isLoading={isAiLoading}
           error={aiError}
           promptBlueprint={promptBlueprint}
-          onAccept={() => {
+          onAccept={async () => {
             if (isLocked) return;
-            const formattedAppend = `<p></p><p>${aiProposal.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br />')}</p>`;
-            editorRef.current?.insertContent(formattedAppend);
-            if (sceneId) {
-              setSaveStatus(true, "Saving...");
-              startTransition(async () => {
-                const res = await updateSceneContent(sceneId, contentRef.current);
-                if (res.success) {
-                  lastSavedRef.current = contentRef.current;
-                  setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                  setUnsavedChanges(false);
-                }
-              });
+            
+            if (aiActionContextRef.current.mode === 'REPLACE' && aiActionContextRef.current.range) {
+              editorRef.current?.replaceRange(aiProposal, aiActionContextRef.current.range);
+            } else {
+              const formattedAppend = `<p></p><p>${aiProposal.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br />')}</p>`;
+              editorRef.current?.insertContent(formattedAppend);
             }
+            
+            await editorRef.current?.forceSave();
             clearProposal();
           }}
           onDiscard={clearProposal}
@@ -268,23 +260,13 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
           
           {!isLocked && (
             <div className="flex items-center gap-2 bg-base-300/30 p-1 rounded-xl border border-base-300/50">
-              <FooterSelector
-                label="Engine"
-                value={getActiveModelDisplayName()}
-                icon={Cpu}
-                dropdownWidth="w-64"
-              >
+              <FooterSelector label="Engine" value={getActiveModelDisplayName()} icon={Cpu} dropdownWidth="w-64">
                 {AI_MODELS.map(group => (
                   <React.Fragment key={group.provider}>
                     <li className="menu-title px-4 py-2 text-[8px] font-black uppercase opacity-30 tracking-widest">{group.provider}</li>
                     {group.models.map(m => (
                       <li key={m.id}>
-                        <button 
-                          className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activeModelName === m.id ? 'bg-primary/10 text-primary' : ''}`}
-                          onClick={() => handleQuickSwitchModel(m.id)}
-                        >
-                          {m.name}
-                        </button>
+                        <button className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activeModelName === m.id ? 'bg-primary/10 text-primary' : ''}`} onClick={() => handleQuickSwitchModel(m.id)}>{m.name}</button>
                       </li>
                     ))}
                     <div className="divider my-1 opacity-5"></div>
@@ -292,31 +274,12 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
                 ))}
               </FooterSelector>
 
-              <FooterSelector
-                label="Template"
-                value={activeTemplate?.name || 'Default'}
-                icon={Layout}
-                dropdownWidth="w-64"
-              >
+              <FooterSelector label="Template" value={activeTemplate?.name || 'Default'} icon={Layout} dropdownWidth="w-64">
                 <li className="menu-title px-4 py-2 text-[8px] font-black uppercase opacity-30 tracking-widest">Logic Selection</li>
-                <li>
-                  <button 
-                    className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${!activePromptTemplateId ? 'bg-primary/10 text-primary' : ''}`}
-                    onClick={() => handleScenePromptTemplateChange(null)}
-                  >
-                    System Default Logic
-                  </button>
-                </li>
+                <li><button className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${!activePromptTemplateId ? 'bg-primary/10 text-primary' : ''}`} onClick={() => handleScenePromptTemplateChange(null)}>System Default Logic</button></li>
                 <div className="divider my-1 opacity-5"></div>
                 {promptTemplates.map(t => (
-                  <li key={t.id}>
-                    <button 
-                      className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activePromptTemplateId === t.id ? 'bg-primary/10 text-primary' : ''}`}
-                      onClick={() => handleScenePromptTemplateChange(t.id)}
-                    >
-                      {t.name}
-                    </button>
-                  </li>
+                  <li key={t.id}><button className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activePromptTemplateId === t.id ? 'bg-primary/10 text-primary' : ''}`} onClick={() => handleScenePromptTemplateChange(t.id)}>{t.name}</button></li>
                 ))}
               </FooterSelector>
 
@@ -330,14 +293,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             <button 
               type="button"
               className={`btn btn-sm btn-square ${isAiLoading ? 'btn-disabled bg-base-300' : 'btn-primary shadow-lg shadow-primary/20 hover:scale-105'} transition-all`}
-              onMouseDown={(e) => { 
-                e.preventDefault(); 
-                if (!isAiLoading && sceneId) {
-                  const targetTemplate = overridePromptTemplateId || activePromptTemplateId || DEFAULT_DRAFTING_TEMPLATE_ID;
-                  createSnapshot(sceneId, contentRef.current, "Auto: Pre-AI");
-                  startStream(bookId, sceneId, overrideAiProfileId || activeAiProfileId || undefined, targetTemplate); 
-                }
-              }}
+              onMouseDown={(e) => { e.preventDefault(); handleAiAction("Draft the next part of the story."); }}
               disabled={isAiLoading}
               title="Generate AI (Cmd+Enter)"
             >

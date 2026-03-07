@@ -15,6 +15,8 @@ export async function POST(req: Request) {
     const taskType = reqBody.taskType || 'DRAFT';
     const originalVersion = reqBody.originalVersion;
     const revisedVersion = reqBody.revisedVersion;
+    const liveContent = reqBody.liveContent;
+    const selectedText = reqBody.selectedText; // CRITICAL: Accept selectedText
 
     if (!sceneId) return new Response('Missing sceneId', { status: 400 });
 
@@ -32,11 +34,13 @@ export async function POST(req: Request) {
       profileId, 
       promptTemplateId, 
       taskType,
-      undefined,
+      selectedText, // CRITICAL: Pass selectedText
       instruction,
       originalVersion,
-      revisedVersion
+      revisedVersion,
+      liveContent
     );
+
 
     const settings = await getAppSettings();
     const model = getAIModel(settings.activeProvider, settings.activeModelName);

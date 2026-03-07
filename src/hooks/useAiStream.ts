@@ -17,10 +17,12 @@ export function useAiStream() {
     instruction?: string,
     taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE' = 'DRAFT',
     originalVersion?: string,
-    revisedVersion?: string
-  ) => {
+    revisedVersion?: string,
+    liveContent?: string,
+    selectedText?: string // CRITICAL: Added selectedText
+    ) => {
     if (!sceneId || !bookId) return;
-    
+
     setIsAiLoading(true);
     setAiProposal("");
     setAiError(null);
@@ -34,10 +36,11 @@ export function useAiStream() {
         profileId, 
         promptTemplateId,
         taskType,
-        undefined,
+        selectedText, // Pass selectedText
         instruction,
         originalVersion,
-        revisedVersion
+        revisedVersion,
+        liveContent
       );
       setPromptBlueprint(`[SYSTEM INSTRUCTION]\n${system}\n\n[USER PROMPT]\n${prompt}`);
 
@@ -52,9 +55,12 @@ export function useAiStream() {
           instruction, 
           taskType,
           originalVersion,
-          revisedVersion
+          revisedVersion,
+          liveContent,
+          selectedText // Pass selectedText
         })
       });
+
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

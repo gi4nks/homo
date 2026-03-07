@@ -24,10 +24,15 @@ import {
   Layout,
   Database,
   ShieldCheck,
-  FileJson
+  FileJson,
+  Users,
+  Plus,
+  X,
+  ChevronRight
 } from 'lucide-react';
 import CharacterModal from '../CharacterModal';
 import InspectorSection from './InspectorSection';
+import { createCharacter } from '@/app/actions/character.actions';
 
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -61,6 +66,7 @@ export default function BookTab({ book }: { book: any }) {
   const [localTone, setLocalTone] = useState(book.tone || '');
   const [localAiProfileId, setLocalAiProfileId] = useState(book.defaultAiProfileId || "");
   const [localPromptTemplateId, setLocalPromptTemplateId] = useState(book.defaultPromptTemplateId || "");
+  const [newCharName, setNewCharName] = useState("");
   
   useEffect(() => { setLocalTitle(book.title || ''); }, [book.title]);
   useEffect(() => { setLocalSynopsis(book.synopsis || ''); }, [book.synopsis]);
@@ -86,6 +92,12 @@ export default function BookTab({ book }: { book: any }) {
 
   const saveField = async (data: any) => {
     if (!activeBookId) return;
+    
+    // Check if data actually changed to avoid redundant saves
+    const keys = Object.keys(data);
+    const hasChanged = keys.some(key => data[key] !== book[key]);
+    if (!hasChanged) return;
+
     setSaveStatus(true, null);
     const res = await updateBookBible(activeBookId, data);
     setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
@@ -97,6 +109,18 @@ export default function BookTab({ book }: { book: any }) {
   useEffect(() => { if (debouncedAuthorialIntent !== (book.authorialIntent || '')) saveField({ authorialIntent: debouncedAuthorialIntent }); }, [debouncedAuthorialIntent]);
   useEffect(() => { if (debouncedLoreConstraints !== (book.loreConstraints || '')) saveField({ loreConstraints: debouncedLoreConstraints }); }, [debouncedLoreConstraints]);
   useEffect(() => { if (debouncedTone !== (book.tone || '')) saveField({ tone: debouncedTone }); }, [debouncedTone]);
+
+  const handleAddChar = async () => {
+    if (!newCharName.trim() || !activeBookId) return;
+    setSaveStatus(true, "Saving...");
+    const res = await createCharacter(activeBookId, { name: newCharName.trim() });
+    if (res.success) {
+      setNewCharName("");
+      setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } else {
+      setSaveStatus(false, "Error");
+    }
+  };
 
   const handleAiProfileChange = (id: string) => {
     const value = id || null;
@@ -169,6 +193,7 @@ export default function BookTab({ book }: { book: any }) {
             className={inputClass}
             value={localTitle}
             onChange={(e) => setLocalTitle(e.target.value)}
+            onBlur={() => saveField({ title: localTitle })}
             placeholder="Book Title..." 
           />
         </div>
@@ -183,6 +208,7 @@ export default function BookTab({ book }: { book: any }) {
             className={textareaClass}
             value={localSynopsis} 
             onChange={(e) => setLocalSynopsis(e.target.value)} 
+            onBlur={() => saveField({ synopsis: localSynopsis })}
             placeholder="The high-level summary..."
           />
         </div>
@@ -206,6 +232,7 @@ export default function BookTab({ book }: { book: any }) {
             className={textareaClass + " min-h-[150px]"}
             value={localTone}
             onChange={(e) => setLocalTone(e.target.value)}
+            onBlur={() => saveField({ tone: localTone })}
             placeholder="Style rules..."
           />
         </div>
@@ -223,6 +250,7 @@ export default function BookTab({ book }: { book: any }) {
             className={textareaClass}
             value={localStyleReference} 
             onChange={(e) => setLocalStyleReference(e.target.value)} 
+            onBlur={() => saveField({ styleReference: localStyleReference })}
             placeholder="Paste your best 3-4 lines here..."
           />
         </div>
@@ -238,6 +266,7 @@ export default function BookTab({ book }: { book: any }) {
             className={inputClass}
             value={localAuthorialIntent}
             onChange={(e) => setLocalAuthorialIntent(e.target.value)}
+            onBlur={() => saveField({ authorialIntent: localAuthorialIntent })}
             placeholder="Define the emotional goal..." 
           />
         </div>
@@ -268,7 +297,69 @@ export default function BookTab({ book }: { book: any }) {
         </div>
       </InspectorSection>
 
-      {/* SECTION 3: WORLDBUILDING */}
+      {/* SECTION 3: GLOBAL CAST - REFACTORED AS LIST */}
+      <InspectorSection title="Global Cast" icon={Users}>
+        <div className="flex flex-col gap-1 mb-4">
+          {book.charactersList?.map((char: any) => (
+            <div 
+              key={char.id} 
+              className="group flex items-center justify-between p-2.5 bg-slate-50 dark:bg-base-300 border border-base-300/30 rounded-xl hover:border-primary/30 transition-all shadow-sm"
+            >
+              <div 
+                className="flex items-center gap-3 cursor-pointer flex-grow min-w-0"
+                onClick={() => { setCharToEdit(char); setIsCharModalOpen(true); }}
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-primary/40 shrink-0"></div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] font-black uppercase tracking-widest truncate">{char.name}</span>
+                  {char.role && (
+                    <span className="text-[8px] font-bold opacity-40 uppercase tracking-tighter truncate">{char.role}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0 ml-2">
+                <button 
+                  className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => { setCharToEdit(char); setIsCharModalOpen(true); }}
+                >
+                  <ChevronRight size={14} className="opacity-40" />
+                </button>
+                <button 
+                  onClick={() => handleDeleteChar(char.id, char.name)}
+                  className="btn btn-ghost btn-xs btn-square text-error opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {(!book.charactersList || book.charactersList.length === 0) && (
+            <p className="text-[10px] opacity-30 italic py-4 text-center border border-dashed border-base-300 rounded-xl">
+              No characters defined yet.
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-2">
+          <input 
+            type="text"
+            className={inputClass + " h-9 !text-[10px] shadow-inner"}
+            placeholder="Quick add character name..."
+            value={newCharName}
+            onChange={(e) => setNewCharName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddChar()}
+          />
+          <button 
+            onClick={handleAddChar}
+            disabled={!newCharName.trim() || isPending}
+            className="btn btn-primary btn-sm h-9 px-4 rounded-xl shadow-lg shadow-primary/20"
+          >
+            <Plus size={16} />
+          </button>
+        </div>
+      </InspectorSection>
+
+      {/* SECTION 4: WORLDBUILDING */}
       <InspectorSection title="Worldbuilding" icon={Layout}>
         <div className="form-control w-full">
           <label className="label py-1">
@@ -280,41 +371,13 @@ export default function BookTab({ book }: { book: any }) {
             className={textareaClass}
             value={localLoreConstraints} 
             onChange={(e) => setLocalLoreConstraints(e.target.value)} 
+            onBlur={() => saveField({ loreConstraints: localLoreConstraints })}
             placeholder="Established rules..."
           />
         </div>
-
-        <details className="group">
-          <summary className="cursor-pointer text-[9px] font-black uppercase opacity-30 flex items-center gap-2 hover:opacity-100 transition-opacity">
-            <Wand2 size={10} /> Master Characters ({book.charactersList?.length || 0})
-          </summary>
-          <div className="pt-4 space-y-3">
-            <button 
-              onClick={() => { setCharToEdit(null); setIsCharModalOpen(true); }} 
-              className="btn btn-outline btn-xs btn-block border-dashed border-base-300 text-[8px] font-black tracking-widest"
-            >
-              <UserPlus size={10} className="mr-2" /> Create Character
-            </button>
-            <div className="flex flex-col gap-1.5">
-              {book.charactersList?.map((char: any) => (
-                <div key={char.id} className="p-2 bg-slate-50 dark:bg-base-300 rounded-lg flex items-center justify-between group/char border border-base-300/30 shadow-sm">
-                  <span className="text-[9px] font-black uppercase tracking-tight truncate">{char.name}</span>
-                  <div className="flex gap-1 opacity-0 group-hover/char:opacity-100 transition-opacity">
-                    <button className="btn btn-ghost btn-xs btn-square" onClick={() => { setCharToEdit(char); setIsCharModalOpen(true); }}>
-                      <Edit2 size={10} />
-                    </button>
-                    <button className="btn btn-ghost btn-xs btn-square text-error" onClick={() => handleDeleteChar(char.id, char.name)}>
-                      <Trash2 size={10} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </details>
       </InspectorSection>
 
-      {/* SECTION 4: DATA & EXPORTS */}
+      {/* SECTION 5: DATA & EXPORTS */}
       <InspectorSection title="Data & Exports" icon={Database}>
         <div className="flex flex-col gap-2">
           <button 

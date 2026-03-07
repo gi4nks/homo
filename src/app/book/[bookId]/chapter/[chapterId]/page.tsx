@@ -33,11 +33,6 @@ export default async function ChapterPage({
           <h1 className="text-5xl font-serif font-black text-base-content tracking-tight">
             {chapter.title}
           </h1>
-          {chapter.chapterGoal && (
-            <div className="mt-8 p-4 bg-base-200/50 rounded-xl border border-base-300 italic text-xs opacity-60 max-w-lg mx-auto">
-              "{chapter.chapterGoal}"
-            </div>
-          )}
         </header>
 
         {/* INTEGRATED SCENES */}

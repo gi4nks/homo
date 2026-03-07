@@ -28,7 +28,8 @@ export async function generatePromptData(
   selectedText?: string, 
   instruction?: string,
   originalVersion?: string,
-  revisedVersion?: string
+  revisedVersion?: string,
+  liveContent?: string // CRITICAL: Added liveContent parameter
 ): Promise<{ system: string; prompt: string }> {
   try {
     const currentScene = await prisma.scene.findUnique({
@@ -46,6 +47,8 @@ export async function generatePromptData(
     });
     if (!book) throw new Error('Book not found');
 
+    // ... [previous code for prevScene logic remains the same] ...
+    
     // Get all scenes in order across all chapters
     const bookWithOrderedContent = await prisma.book.findUnique({
       where: { id: bookId },
@@ -76,7 +79,9 @@ export async function generatePromptData(
       prevScene = await prisma.scene.findUnique({ where: { id: prevSceneSummary.id } });
     }
 
-    const currentContentClean = cleanHtml(currentScene.content);
+    // CRITICAL: Use liveContent if provided, otherwise fallback to DB content
+    const contentToUse = liveContent !== undefined ? liveContent : currentScene.content;
+    const currentContentClean = cleanHtml(contentToUse);
     const prevContentClean = prevScene ? cleanHtml(prevScene.content) : "";
 
     let previousTextSnippet = "";

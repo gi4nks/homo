@@ -12,7 +12,8 @@ export async function POST(req: Request) {
       bookId, 
       sceneId, 
       profileId, 
-      promptTemplateId 
+      promptTemplateId,
+      liveContent // CRITICAL: Accept liveContent
     } = await req.json();
 
     if (!selectedText || !instruction || !bookId || !sceneId) {
@@ -27,7 +28,10 @@ export async function POST(req: Request) {
       promptTemplateId, 
       'REWRITE', 
       selectedText, 
-      instruction
+      instruction,
+      undefined,
+      undefined,
+      liveContent // CRITICAL: Pass liveContent
     );
 
     const settings = await getAppSettings();

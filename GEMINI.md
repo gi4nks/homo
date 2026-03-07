@@ -1,4 +1,4 @@
-# HOMO - Engineering Manifest v2.4.0
+# HOMO - Engineering Manifest v2.6.0
 
 ## 🎯 Project Overview
 "HOMO" is a specialized drafting tool for authors. It prioritizes structure, context, and a distraction-free writing experience. The app uses a hierarchical data model (Book -> Chapter -> Scene) to provide LLMs with precise context for generating high-quality drafting prompts.
@@ -8,14 +8,15 @@
 - **AI Engine**: Multi-provider support (Google Gemini, Anthropic Claude, OpenAI GPT) via Vercel AI SDK.
 - **Styling**: Tailwind CSS 4 + DaisyUI 5. Strictly semantic classes (`base-100`, `base-200`, `card`, `collapse`).
 - **Database**: SQLite with Prisma 6.
-- **Editor**: TipTap with internal scrolling, extreme density overrides, and AI-powered Bubble Menu.
+- **Editor**: TipTap with internal scrolling, extreme density overrides, and unified AI Proposal blocks.
 
 ## 🏗️ Architecture
 
 ### 1. State Management & Sync
 - **URL & Zustand**: Navigation is URL-driven. UI state (panel visibility, focus mode, active engine) is managed via Zustand (`src/store/useWorkspaceStore.ts`).
-- **WorkspaceSync**: A robust synchronization layer that aligns server data with the global store, handling structural changes while protecting optimistic UI states.
-- **Bidirectional Sync**: Editor footer controls (Model, Template, Persona) are synchronized with the Inspector and persisted to the DB via Server Actions.
+- **Unified AI Flow**: AI commands from the Bubble Menu and general drafting from the Footer now share the same logic and UI component (`AiProposalBox`).
+- **Precision Replacement**: Revision tasks use `insertContentAt` with persistent selection coordinates to perfectly overwrite original text even after UI deselects.
+- **Hardened Auto-Save**: Metadata fields in the Inspector (Synopsis, Goals, Lore) now feature debounced auto-save + `onBlur` force-sync, integrated with the global sync indicator.
 
 ### 2. Scene Security & Lifecycle
 - **Scene Locking**: A hardcoded protection mechanism (`isLocked`) that disables editing and AI generation for finalized prose.
@@ -29,12 +30,12 @@
 
 ### 4. AI Intelligence (SSOT)
 - **Prompt Factory (`lib/prompt-builder.ts`)**: Single source of truth. Standardizes prompt hierarchy (Core Engine -> Style -> Persona -> Context -> Task).
-- **Hardened Bubble Menu**: A floating action bar appended to `document.body` (via Tippy.js) to prevent clipping, featuring a refined Sans-Serif UI.
-- **Harmonized AI Proposals**: Unified indigo-themed design for both drafting and revision proposals, including integrated XML Blueprints.
+- **Live Content Injection**: AI API calls (`/api/generate`) now receive `liveContent` from the client ref, bypassing stale database states.
+- **Global Cast Management**: Centralized character list in the Book tab acting as the master source for scene-level character selection.
 
 ## 💾 Data Safety & UX
 - **Snapshot System**: Automated versioning ("Auto: Pre-AI") captured before every AI generation to prevent data loss.
-- **Custom Confirmation**: A DaisyUI-native asynchronous modal system for dangerous operations (restoring, deleting, unlocking).
+- **Force Flush Logic**: Every AI trigger forces an immediate synchronous save to the database before the LLM is invoked.
 - **Focus Mode**: Optimized for hardcore drafting with a `98vw` card width and maximized text density.
 
 ## 📜 Roadmap
@@ -42,6 +43,7 @@
 - [x] Full Database Backup & Manuscript Export.
 - [x] Version history / Snapshots.
 - [x] Scene Locking & Protection logic.
-- [x] DaisyUI 5 Theme Migration (Fantasy).
+- [x] Unified AI Drafting/Revision flow.
+- [x] Global Cast Management (Book Tab).
 - [ ] Multi-format Export (PDF/ePub).
 - [ ] Collaboration / Sync (Optional).
