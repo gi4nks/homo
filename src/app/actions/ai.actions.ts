@@ -24,9 +24,11 @@ export async function generatePromptData(
   currentSceneId: string, 
   profileId?: string, 
   promptTemplateId?: string,
-  taskType: 'DRAFT' | 'REWRITE' = 'DRAFT', 
+  taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE' = 'DRAFT', 
   selectedText?: string, 
-  instruction?: string
+  instruction?: string,
+  originalVersion?: string,
+  revisedVersion?: string
 ): Promise<{ system: string; prompt: string }> {
   try {
     const currentScene = await prisma.scene.findUnique({
@@ -105,7 +107,9 @@ export async function generatePromptData(
       selectedText,
       inlineInstruction: instruction,
       previousTextSnippet,
-      previousSceneGoal: prevScene?.promptGoals
+      previousSceneGoal: prevScene?.promptGoals,
+      originalVersion,
+      revisedVersion
     });
 
   } catch (error) {

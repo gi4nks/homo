@@ -4,7 +4,6 @@ import React, { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
-import { compileManuscript } from '@/app/actions/book.actions';
 import { 
   Home, 
   Sun, 
@@ -19,9 +18,6 @@ import {
   PanelLeftClose,
   PanelRightOpen,
   PanelRightClose,
-  FileDown,
-  Loader2,
-  FileCode
 } from 'lucide-react';
 import ScenePromptGeneratorWrapper from './ScenePromptGeneratorWrapper';
 
@@ -33,17 +29,24 @@ export default function GlobalHeader() {
     rightPanelOpen, toggleRightPanel
   } = useWorkspaceStore();
   
-  const [theme, setTheme] = useState('emerald');
+  const [theme, setTheme] = useState('fantasy');
 
-  // Theme Logic
+  // Theme Logic with Migration
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'emerald';
+    let savedTheme = localStorage.getItem('theme') || 'fantasy';
+    
+    // FORCE MIGRATION: If the user was on emerald or corporate, move them to fantasy
+    if (savedTheme === 'emerald' || savedTheme === 'corporate') {
+      savedTheme = 'fantasy';
+      localStorage.setItem('theme', 'fantasy');
+    }
+
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'emerald' ? 'dark' : 'emerald';
+    const newTheme = theme === 'fantasy' ? 'dark' : 'fantasy';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
@@ -53,37 +56,28 @@ export default function GlobalHeader() {
   const pathParts = pathname.split('/').filter(Boolean);
   const derivedBookId = isBookWorkspace ? pathParts[1] : null;
 
-  // Optimized Breadcrumb Logic
   const breadcrumbItems = [];
-  
-  // Rule: If in workspace, we only show HOME > WORKSPACE > [BOOK TITLE]
   if (isBookWorkspace) {
     breadcrumbItems.push({ label: 'Workspace', path: '/book' });
     breadcrumbItems.push({ label: activeBookTitle || 'Current Book', path: `/book/${derivedBookId}` });
   } else {
-    // Normal mapping for other pages (settings, etc)
     let currentPath = '';
     pathParts.forEach((part) => {
       currentPath += `/${part}`;
       let label = part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, ' ');
-      
-      // Custom label mappings
       if (part === 'prompts') label = 'Prompt CMS';
       if (part === 'profiles') label = 'AI Personas';
       if (part === 'genres') label = 'Genre Rules';
       if (part === 'ai-models') label = 'AI Models';
-      if (part === 'settings') label = 'Settings';
-
       breadcrumbItems.push({ label, path: currentPath });
     });
   }
 
   return (
-    <header className="navbar bg-base-100 border-b border-base-200 sticky top-0 z-50 px-6 min-h-16 shrink-0 shadow-sm">
-      {/* LEFT */}
+    <header className="navbar bg-base-100 border-b border-base-200 sticky top-0 z-50 px-6 min-h-16 shrink-0 shadow-sm font-sans">
       <div className="navbar-start gap-4 flex-grow-0">
         <Link href="/" className="btn btn-ghost p-0 hover:bg-transparent flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary text-primary-content rounded-lg flex items-center justify-center font-black shadow-lg">H</div>
+          <div className="w-8 h-8 bg-primary text-primary-content rounded-lg flex items-center justify-center font-black shadow-lg text-lg">H</div>
         </Link>
 
         {isBookWorkspace && (
@@ -113,35 +107,28 @@ export default function GlobalHeader() {
         </div>
       </div>
 
-      <div className="navbar-center hidden lg:flex"></div>
-
-      {/* RIGHT */}
       <div className="navbar-end gap-3 flex-grow">
         {isBookWorkspace && (
-          <>
-            <div className="flex items-center gap-3 px-4 py-1.5 bg-base-200/50 rounded-full border border-base-300 animate-in fade-in duration-300 shrink-0">
-              {saveStatus.isSaving ? (
-                <div className="flex items-center gap-2 text-primary font-black text-[9px] uppercase tracking-widest">
-                  <RefreshCw size={12} className="animate-spin" /> Syncing...
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-success font-black text-[9px] uppercase tracking-widest">
-                  <CheckCircle2 size={12} /> Synchronized
-                </div>
-              )}
-              {saveStatus.lastSynced && <span className="text-[9px] font-bold opacity-30 uppercase tracking-tighter border-l border-base-300 pl-3 ml-1 hidden sm:inline">{saveStatus.lastSynced}</span>}
-            </div>
-          </>
+          <div className="flex items-center gap-3 px-4 py-1.5 bg-base-200/50 rounded-full border border-base-300 animate-in fade-in duration-300 shrink-0">
+            {saveStatus.isSaving ? (
+              <div className="flex items-center gap-2 text-primary font-black text-[9px] uppercase tracking-widest">
+                <RefreshCw size={12} className="animate-spin" /> Syncing...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-success font-black text-[9px] uppercase tracking-widest">
+                <CheckCircle2 size={12} /> Synchronized
+              </div>
+            )}
+            {saveStatus.lastSynced && <span className="text-[9px] font-bold opacity-30 uppercase tracking-tighter border-l border-base-300 pl-3 ml-1 hidden sm:inline">{saveStatus.lastSynced}</span>}
+          </div>
         )}
 
-        {isBookWorkspace && derivedBookId && (
-          <ScenePromptGeneratorWrapper bookId={derivedBookId} />
-        )}
+        {isBookWorkspace && derivedBookId && <ScenePromptGeneratorWrapper bookId={derivedBookId} />}
 
         <div className="divider divider-horizontal mx-0 h-6 opacity-10"></div>
 
         <button className="btn btn-ghost btn-sm btn-circle shrink-0" onClick={toggleTheme}>
-          {theme === 'emerald' ? <Moon size={18} /> : <Sun size={18} />}
+          {theme === 'fantasy' ? <Moon size={18} /> : <Sun size={18} />}
         </button>
 
         <div className="dropdown dropdown-end shrink-0">

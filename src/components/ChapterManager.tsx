@@ -19,6 +19,10 @@ import {
   BarChart3,
   PanelLeftClose,
   GripVertical,
+  Lock,
+  CheckCircle,
+  Book,
+  BookOpen as BookOpenIcon
 } from 'lucide-react';
 
 // DND Kit Imports
@@ -50,7 +54,7 @@ const FormattedNumber = ({ value }: { value: number }) => {
 };
 
 // --- SORTABLE SCENE ---
-const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: string, bookId: string }) => {
+const SortableScene = ({ scene, chapterId, bookId }: { scene: any, chapterId: string, bookId: string }) => {
   const params = useParams();
   const router = useRouter();
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
@@ -68,18 +72,27 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
         onClick={() => router.push(`/book/${bookId}/chapter/${chapterId}/scene/${scene.id}`)}
         className={`flex items-start gap-2 w-full p-2.5 rounded-lg group/scene transition-all border-l-4 cursor-pointer ${
           isSelected 
-            ? 'bg-primary/10 border-l-primary text-primary shadow-sm font-black' 
-            : 'hover:bg-base-200 border-l-transparent text-base-content/60'
+            ? 'bg-primary/10 border-l-primary shadow-sm font-black' 
+            : 'hover:bg-base-200 border-l-transparent'
         }`}
       >
         <div {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing opacity-0 group-hover/scene:opacity-30" onClick={(e) => e.stopPropagation()}>
           <GripVertical size={12} />
         </div>
         <div className="flex flex-col flex-grow min-w-0">
-           <span className="text-[11px] leading-tight truncate">
-              <span className="opacity-40 font-mono mr-1">{scene.sceneNumber}.</span> {scene.title}
+           <span className={`text-[11px] leading-tight truncate flex items-center gap-1.5 transition-all ${
+             isSelected 
+               ? 'text-primary' 
+               : (scene.isLocked ? 'text-slate-400 italic font-normal' : 'text-base-content/70 font-bold')
+           }`}>
+              <span className="opacity-40 font-mono mr-1">{scene.sceneNumber}.</span> 
+              {scene.title}
            </span>
-           <span className="text-[9px] opacity-40 font-bold mt-1 uppercase tracking-tighter">
+           <span className={`text-[9px] mt-1 uppercase tracking-tighter transition-opacity ${
+             isSelected 
+               ? 'opacity-60 font-black' 
+               : (scene.isLocked ? 'text-slate-400/50 italic font-normal' : 'opacity-40 font-bold')
+           }`}>
              <FormattedNumber value={scene.wordCount || 0} /> words
            </span>
         </div>
@@ -101,7 +114,7 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
 };
 
 // --- SORTABLE CHAPTER ---
-const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapters }: { chapter: Chapter, bookId: string, expandedChapters: Set<string>, setExpandedChapters: any }) => {
+const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapters }: { chapter: any, bookId: string, expandedChapters: Set<string>, setExpandedChapters: any }) => {
   const params = useParams();
   const router = useRouter();
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
@@ -115,7 +128,7 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 100 : 'auto' };
 
   const getChapterWordCount = () => {
-    return chapter.scenes.reduce((acc, scene) => acc + (scene.wordCount || 0), 0);
+    return chapter.scenes.reduce((acc: number, scene: any) => acc + (scene.wordCount || 0), 0);
   };
 
   const sortedScenes = useMemo(() => 
@@ -123,14 +136,16 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
     [chapter.scenes]
   );
 
+  const isChapterCompleted = chapter.scenes.length > 0 && chapter.scenes.every((s: any) => s.isLocked);
+
   return (
     <li ref={setNodeRef} style={style} className={`w-full list-none ${isDragging ? 'opacity-50' : ''}`}>
       <div className="flex flex-col w-full p-0">
         <div 
           className={`flex items-start gap-2 w-full p-2.5 rounded-xl group/chapter cursor-pointer border transition-all ${
             isChapterActive 
-              ? 'bg-base-200 border-base-300 text-primary font-black shadow-inner' 
-              : 'border-transparent hover:bg-base-200 text-base-content/80 font-bold'
+              ? 'bg-base-200 border-base-300 shadow-inner' 
+              : 'border-transparent hover:bg-base-200'
           }`}
           onClick={() => router.push(`/book/${bookId}/chapter/${chapter.id}`)}
         >
@@ -140,6 +155,7 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
           
           <div 
             className="mt-1 transition-transform duration-200 hover:scale-110"
+            title={isChapterCompleted ? "Chapter Complete & Archived" : undefined}
             onClick={(e) => { 
               e.stopPropagation(); 
               setExpandedChapters((prev: Set<string>) => {
@@ -153,14 +169,24 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
               });
             }}
           >
-            {isExpanded ? <FolderOpen size={16} className="text-primary" /> : <Folder size={16} className="opacity-30" />}
+            {isChapterCompleted ? (
+              <Book size={16} className="text-slate-400" />
+            ) : (
+              isExpanded ? <FolderOpen size={16} className="text-primary" /> : <Folder size={16} className="opacity-30" />
+            )}
           </div>
 
           <div className="flex flex-col flex-grow min-w-0">
-             <span className="text-[10px] uppercase tracking-widest truncate">
+             <span className={`text-[10px] uppercase tracking-widest truncate transition-colors ${
+               isChapterActive 
+                 ? 'text-primary font-black' 
+                 : (isChapterCompleted ? 'text-slate-400 italic font-normal' : 'text-base-content/80 font-bold')
+             }`}>
                 <span className="opacity-40 font-mono mr-1">CH{chapter.chapterNumber}.</span> {chapter.title}
              </span>
-             <span className="text-[8px] font-black opacity-30 mt-1 uppercase tracking-tighter">
+             <span className={`text-[8px] font-black mt-1 uppercase tracking-tighter transition-opacity ${
+               isChapterActive ? 'opacity-60' : (isChapterCompleted ? 'text-slate-400/40 italic' : 'opacity-30')
+             }`}>
                <FormattedNumber value={getChapterWordCount()} /> words total
              </span>
           </div>
@@ -195,7 +221,7 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
 };
 
 // --- MAIN COMPONENT ---
-const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: () => void }> = ({ bookId, chapters: initialChapters, onClose }) => {
+const ChapterManager: React.FC<{ bookId: string; chapters: any[]; onClose?: () => void }> = ({ bookId, chapters: initialChapters, onClose }) => {
   const params = useParams();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -208,14 +234,10 @@ const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: 
 
   const isDashboardActive = !params.chapterId && !params.sceneId;
 
-  // Sync initial chapters to store
+  // Component visibility only
   useEffect(() => { 
     setMounted(true);
-    // Initialize store with initial data from server
-    if (initialChapters) {
-      setChapters([...initialChapters].sort((a,b) => a.orderIndex - b.orderIndex)); 
-    }
-  }, [initialChapters, setChapters]);
+  }, []);
 
   useEffect(() => {
     if (params.chapterId) {

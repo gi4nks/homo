@@ -24,9 +24,9 @@ import { ActionResponse } from '@/lib/types';
 function calculateWordCount(html: string): number {
   if (!html) return 0;
   const text = html
-    .replace(/<[^>]*>?/gm, ' ') // Strip HTML tags
+    .replace(/<[^>]*>?/gm, ' ') 
     .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')       // Collapse whitespace
+    .replace(/\s+/g, ' ')       
     .trim();
   return text ? text.split(/\s+/).length : 0;
 }
@@ -35,9 +35,7 @@ function calculateWordCount(html: string): number {
 
 export async function createScene(chapterId: string, title: string): Promise<ActionResponse<Scene>> {
   const validated = CreateSceneSchema.safeParse({ chapterId, title });
-  if (!validated.success) {
-    return { success: false, error: "Invalid data", fieldErrors: validated.error.flatten().fieldErrors };
-  }
+  if (!validated.success) return { success: false, error: "Invalid data" };
 
   try {
     const chapter = await prisma.chapter.findUnique({ where: { id: validated.data.chapterId } });
@@ -50,49 +48,32 @@ export async function createScene(chapterId: string, title: string): Promise<Act
     
     const nextNumber = (lastScene?.sceneNumber ?? 0) + 1;
     const scene = await prisma.scene.create({
-      data: { 
-        title: validated.data.title, 
-        chapterId: validated.data.chapterId, 
-        orderIndex: nextNumber, 
-        sceneNumber: nextNumber 
-      },
+      data: { title: validated.data.title, chapterId: validated.data.chapterId, orderIndex: nextNumber, sceneNumber: nextNumber },
     });
 
     revalidatePath(`/book/${chapter.bookId}`);
     return { success: true, data: scene };
-  } catch (err) {
-    return { success: false, error: "Failed to create scene" };
-  }
+  } catch (err) { return { success: false, error: "Failed to create scene" }; }
 }
 
 export async function updateSceneContent(id: string, content: string): Promise<ActionResponse<Scene>> {
   const validated = UpdateSceneContentSchema.safeParse({ id, content });
-  if (!validated.success) {
-    return { success: false, error: "Invalid ID or Content", fieldErrors: validated.error.flatten().fieldErrors };
-  }
+  if (!validated.success) return { success: false, error: "Invalid ID or Content" };
 
   try {
     const wordCount = calculateWordCount(validated.data.content);
     const scene = await prisma.scene.update({
       where: { id: validated.data.id },
-      data: { 
-        content: validated.data.content,
-        wordCount: wordCount
-      },
+      data: { content: validated.data.content, wordCount },
       include: { chapter: true }
     });
-    revalidatePath(`/book/${scene.chapter.bookId}`);
     return { success: true, data: scene };
-  } catch (err) {
-    return { success: false, error: "Failed to update content" };
-  }
+  } catch (err) { return { success: false, error: "Failed to update content" }; }
 }
 
 export async function updateScenePromptGoals(id: string, promptGoals: string): Promise<ActionResponse<Scene>> {
   const validated = UpdateScenePromptGoalsSchema.safeParse({ id, promptGoals });
-  if (!validated.success) {
-    return { success: false, error: "Invalid data", fieldErrors: validated.error.flatten().fieldErrors };
-  }
+  if (!validated.success) return { success: false, error: "Invalid data" };
 
   try {
     const scene = await prisma.scene.update({
@@ -100,11 +81,8 @@ export async function updateScenePromptGoals(id: string, promptGoals: string): P
       data: { promptGoals: validated.data.promptGoals },
       include: { chapter: true }
     });
-    revalidatePath(`/book/${scene.chapter.bookId}`);
     return { success: true, data: scene };
-  } catch (err) {
-    return { success: false, error: "Failed to update goals" };
-  }
+  } catch (err) { return { success: false, error: "Failed to update goals" }; }
 }
 
 export async function deleteScene(id: string): Promise<ActionResponse<{ id: string }>> {
@@ -112,102 +90,19 @@ export async function deleteScene(id: string): Promise<ActionResponse<{ id: stri
   if (!validated.success) return { success: false, error: "Invalid ID" };
 
   try {
-    const scene = await prisma.scene.findUnique({ 
-      where: { id: validated.data }, 
-      include: { chapter: true } 
-    });
+    const scene = await prisma.scene.findUnique({ where: { id: validated.data }, include: { chapter: true } });
     if (!scene) return { success: false, error: "Scene not found" };
-
-    const { chapterId, orderIndex } = scene;
     const bookId = scene.chapter.bookId;
 
-    await prisma.$transaction([
-      prisma.scene.delete({ where: { id: validated.data } }),
-      prisma.scene.updateMany({
-        where: { chapterId, orderIndex: { gt: orderIndex } },
-        data: { orderIndex: { decrement: 1 }, sceneNumber: { decrement: 1 } }
-      })
-    ]);
-
+    await prisma.scene.delete({ where: { id: validated.data } });
     revalidatePath(`/book/${bookId}`);
     return { success: true, data: { id: validated.data } };
-  } catch (err) {
-    return { success: false, error: "Failed to delete scene" };
-  }
-}
-
-export async function reorderScenes(chapterId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse<null>> {
-  const validatedParent = IdSchema.safeParse(chapterId);
-  const validatedUpdates = ReorderPayloadSchema.safeParse(updates);
-
-  if (!validatedParent.success || !validatedUpdates.success) {
-    return { success: false, error: "Invalid reorder payload" };
-  }
-
-  try {
-    await prisma.$transaction(
-      validatedUpdates.data.map(u => prisma.scene.update({
-        where: { id: u.id },
-        data: { orderIndex: u.orderIndex, sceneNumber: u.orderIndex }
-      }))
-    );
-    const chapter = await prisma.chapter.findUnique({ where: { id: validatedParent.data } });
-    if (chapter) revalidatePath(`/book/${chapter.bookId}`);
-    return { success: true, data: null };
-  } catch (err) {
-    return { success: false, error: "Failed to reorder scenes" };
-  }
-}
-
-export async function toggleCharacterInScene(sceneId: string, characterId: string): Promise<ActionResponse<{ isPresent: boolean }>> {
-  const validated = ToggleCharacterInSceneSchema.safeParse({ sceneId, characterId });
-  if (!validated.success) return { success: false, error: "Invalid IDs" };
-
-  try {
-    const scene = await prisma.scene.findUnique({ 
-      where: { id: validated.data.sceneId }, 
-      include: { characters: true, chapter: true } 
-    });
-    if (!scene) return { success: false, error: "Scene not found" };
-
-    const isPresent = scene.characters.some(c => c.id === validated.data.characterId);
-    
-    await prisma.scene.update({
-      where: { id: validated.data.sceneId },
-      data: { 
-        characters: isPresent 
-          ? { disconnect: { id: validated.data.characterId } } 
-          : { connect: { id: validated.data.characterId } } 
-      }
-    });
-
-    revalidatePath(`/book/${scene.chapter.bookId}`);
-    return { success: true, data: { isPresent: !isPresent } };
-  } catch (err) {
-    return { success: false, error: "Failed to toggle character" };
-  }
-}
-
-export async function getSceneById(id: string): Promise<ActionResponse<Scene>> {
-  const validated = IdSchema.safeParse(id);
-  if (!validated.success) return { success: false, error: "Invalid Scene ID" };
-
-  try {
-    const scene = await prisma.scene.findUnique({
-      where: { id: validated.data }
-    });
-    if (!scene) return { success: false, error: "Scene not found" };
-    return { success: true, data: scene };
-  } catch (err) {
-    return { success: false, error: "Database error fetching scene" };
-  }
+  } catch (err) { return { success: false, error: "Failed to delete scene" }; }
 }
 
 export async function updateScene(id: string, data: Partial<UpdateSceneInput>): Promise<ActionResponse<Scene>> {
   const validated = UpdateSceneSchema.safeParse({ id, ...data });
-  if (!validated.success) {
-    return { success: false, error: "Invalid update data", fieldErrors: validated.error.flatten().fieldErrors };
-  }
+  if (!validated.success) return { success: false, error: "Invalid data" };
 
   try {
     const { id: sceneId, ...payload } = validated.data;
@@ -222,57 +117,38 @@ export async function updateScene(id: string, data: Partial<UpdateSceneInput>): 
       data: updateData,
       include: { chapter: true }
     });
-    revalidatePath(`/book/${scene.chapter.bookId}`);
+    
     return { success: true, data: scene };
-  } catch (err) {
+  } catch (err: any) {
     return { success: false, error: "Failed to update scene" };
   }
 }
 
-export async function cloneScene(id: string): Promise<ActionResponse<Scene>> {
-  const validated = CloneItemSchema.safeParse({ id });
-  if (!validated.success) return { success: false, error: "Invalid Scene ID" };
-
+export async function getSceneById(id: string): Promise<ActionResponse<Scene>> {
   try {
-    const original = await prisma.scene.findUnique({
-      where: { id: validated.data.id },
-      include: { characters: { select: { id: true } }, chapter: true }
+    const scene = await prisma.scene.findUnique({ where: { id } });
+    if (!scene) return { success: false, error: "Scene not found" };
+    return { success: true, data: scene };
+  } catch (err) { return { success: false, error: "Database error" }; }
+}
+
+export async function toggleCharacterInScene(sceneId: string, characterId: string): Promise<ActionResponse<{ isPresent: boolean }>> {
+  try {
+    const scene = await prisma.scene.findUnique({ where: { id: sceneId }, include: { characters: true, chapter: true } });
+    if (!scene) return { success: false, error: "Scene not found" };
+    const isPresent = scene.characters.some(c => c.id === characterId);
+    
+    await prisma.scene.update({
+      where: { id: sceneId },
+      data: { characters: isPresent ? { disconnect: { id: characterId } } : { connect: { id: characterId } } }
     });
-    if (!original) return { success: false, error: "Original scene not found" };
+    return { success: true, data: { isPresent: !isPresent } };
+  } catch (err) { return { success: false, error: "Failed to toggle character" }; }
+}
 
-    const newScene = await prisma.$transaction(async (tx) => {
-      // 1. Shift siblings forward to make room
-      await tx.scene.updateMany({
-        where: { 
-          chapterId: original.chapterId, 
-          orderIndex: { gt: original.orderIndex } 
-        },
-        data: { 
-          orderIndex: { increment: 1 }, 
-          sceneNumber: { increment: 1 } 
-        }
-      });
-
-      // 2. Create the duplicated record
-      return await tx.scene.create({
-        data: {
-          title: `${original.title} (Copy)`,
-          chapterId: original.chapterId,
-          orderIndex: original.orderIndex + 1,
-          sceneNumber: original.sceneNumber + 1,
-          content: original.content,
-          promptGoals: original.promptGoals,
-          characters: {
-            connect: original.characters.map(c => ({ id: c.id }))
-          }
-        }
-      });
-    });
-
-    revalidatePath(`/book/${original.chapter.bookId}`);
-    return { success: true, data: newScene };
-  } catch (error) {
-    console.error("Clone Scene Error:", error);
-    return { success: false, error: "Failed to clone scene" };
-  }
+export async function reorderScenes(chapterId: string, updates: any): Promise<ActionResponse<null>> {
+  try {
+    await prisma.$transaction(updates.map((u: any) => prisma.scene.update({ where: { id: u.id }, data: { orderIndex: u.orderIndex, sceneNumber: u.orderIndex } })));
+    return { success: true, data: null };
+  } catch (err) { return { success: false, error: "Failed to reorder" }; }
 }

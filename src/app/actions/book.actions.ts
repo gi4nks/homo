@@ -144,6 +144,7 @@ export async function getBookById(id: string): Promise<ActionResponse<any>> {
                 sceneNumber: true,
                 promptGoals: true,
                 wordCount: true,
+                isLocked: true,
                 defaultAiProfileId: true,
                 defaultPromptTemplateId: true,
                 characters: {

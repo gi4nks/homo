@@ -12,11 +12,13 @@ interface PromptParams {
   scene: any;
   aiProfileId?: string;
   promptTemplateId?: string;
-  taskType: 'DRAFT' | 'REWRITE';
+  taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE';
   inlineInstruction?: string;
   selectedText?: string;
   previousTextSnippet?: string;
   previousSceneGoal?: string;
+  originalVersion?: string;
+  revisedVersion?: string;
 }
 
 export async function buildMasterPrompt({
@@ -29,11 +31,12 @@ export async function buildMasterPrompt({
   inlineInstruction,
   selectedText,
   previousTextSnippet,
-  previousSceneGoal
+  previousSceneGoal,
+  originalVersion,
+  revisedVersion
 }: PromptParams): Promise<{ system: string; prompt: string }> {
   
   // 1. FETCH TEMPLATE
-  // Priority: Explicit ID -> Book specific template -> Default template
   const targetTemplateId = promptTemplateId || book.defaultPromptTemplateId;
   let template = null;
   
@@ -42,7 +45,13 @@ export async function buildMasterPrompt({
   }
   
   if (!template) {
-    template = await prisma.promptTemplate.findFirst({ where: { isDefault: true } });
+    // If analyzing, look for the analyst template specifically if no override
+    if (taskType === 'ANALYZE') {
+      template = await prisma.promptTemplate.findFirst({ where: { name: { contains: "Analyst" } } });
+    }
+    if (!template) {
+      template = await prisma.promptTemplate.findFirst({ where: { isDefault: true } });
+    }
   }
 
   if (!template) {
@@ -50,7 +59,6 @@ export async function buildMasterPrompt({
   }
 
   // 2. FETCH AI PROFILE
-  // Priority: Explicit ID -> Book specific profile -> Default profile
   const targetProfileId = aiProfileId || book.defaultAiProfileId;
   let profile = null;
 
@@ -82,8 +90,10 @@ export async function buildMasterPrompt({
     sceneCast: scene.characters?.map((c: any) => `- ${c.name}: ${c.description || c.role}`).join('\n') || 'N/A',
     previousSceneGoal: previousSceneGoal || 'N/A',
     previousContent: previousTextSnippet || 'Start of section.',
-    taskType: taskType === 'DRAFT' ? 'DRAFTING CONTINUATION' : 'INLINE REWRITE/EDIT',
-    taskGoal: taskType === 'DRAFT' ? currentObjective : selectedText,
+    taskType: taskType === 'DRAFT' ? 'DRAFTING CONTINUATION' : taskType === 'REWRITE' ? 'INLINE REWRITE/EDIT' : 'DIFF ANALYSIS',
+    taskGoal: taskType === 'DRAFT' ? currentObjective : taskType === 'REWRITE' ? selectedText : `Analyze the differences between the original and revised versions.`,
+    originalVersion: originalVersion || 'N/A',
+    revisedVersion: revisedVersion || 'N/A',
   };
 
   // 4. CONDITIONAL INSTRUCTIONS
@@ -99,9 +109,27 @@ export async function buildMasterPrompt({
     templateData.finalConstraint = isNonFiction
       ? "Focus on clarity, value delivery, and maintaining the author's intended message. Do not treat this as a fictional story."
       : "Focus on sensory details, show-don't-tell, and character agency.";
-  } else {
+  } else if (taskType === 'REWRITE') {
     templateData.taskInstruction = `Rewrite the selected text strictly following this instruction: ${inlineInstruction}. Apply the stylistic lens of the persona while remaining compatible with the manuscript style.`;
     templateData.finalConstraint = "Return ONLY the rewritten text. No quotes, no preamble, no commentary.";
+  } else if (taskType === 'ANALYZE') {
+    templateData.taskInstruction = `Compare the following two versions of the scene.
+<VERSIONE_ORIGINALE>
+${originalVersion}
+</VERSIONE_ORIGINALE>
+
+<VERSIONE_REVISIONATA>
+${revisedVersion}
+</VERSIONE_REVISIONATA>
+
+Provide a deep critical analysis of the changes. Focus on:
+1. Pacing and rhythm improvements or degradations.
+2. Sensory detail density.
+3. Adherence to character voice.
+4. Overall impact of the rewrite.
+
+Be brutal but constructive. Use Markdown for formatting.`;
+    templateData.finalConstraint = "Provide a structured critique. End with a score from 1-10 for the revision quality.";
   }
 
   // 5. ASSEMBLY

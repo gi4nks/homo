@@ -30,20 +30,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="emerald">
+    <html lang="en" data-theme="fantasy">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col overflow-hidden bg-base-200 text-base-content`}>
         <AiEngineSync />
-        {/* HEADER: Altezza fissa */}
+        {/* HEADER: Fixed height */}
         <div className="flex-none">
           <GlobalHeader />
         </div>
         
-        {/* MAIN: Occupa tutto lo spazio restante e gestisce i suoi scroll interni */}
+        {/* MAIN: Occupies remaining space */}
         <main className="flex-1 overflow-hidden">
           {children}
         </main>
         
-        {/* FOOTER: Altezza fissa, bloccato in fondo senza sovrapposizioni */}
+        {/* FOOTER: Fixed height at bottom */}
         <div className="flex-none">
           <Footer />
         </div>

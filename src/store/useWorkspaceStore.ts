@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type WorkspaceTab = 'book' | 'chapter' | 'scene';
+export type WorkspaceTab = 'book' | 'chapter' | 'scene' | 'history';
 
 export interface Scene {
   id: string;
@@ -8,6 +8,7 @@ export interface Scene {
   orderIndex: number;
   sceneNumber: number;
   wordCount: number;
+  isLocked?: boolean;
 }
 
 export interface Chapter {
@@ -77,6 +78,7 @@ interface WorkspaceState {
   // Actions for Sidebar
   setChapters: (chapters: Chapter[]) => void;
   updateSceneWordCount: (sceneId: string, wordCount: number) => void;
+  updateSceneLock: (sceneId: string, isLocked: boolean) => void;
   
   // Actions for Scene Defaults
   setActiveAiProfileId: (id: string | null) => void;
@@ -151,6 +153,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       ...chapter,
       scenes: chapter.scenes.map(scene => 
         scene.id === sceneId ? { ...scene, wordCount } : scene
+      )
+    }))
+  })),
+
+  updateSceneLock: (sceneId, isLocked) => set((state) => ({
+    chapters: state.chapters.map(chapter => ({
+      ...chapter,
+      scenes: chapter.scenes.map(scene => 
+        scene.id === sceneId ? { ...scene, isLocked } : scene
       )
     }))
   })),

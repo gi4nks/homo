@@ -14,7 +14,10 @@ export function useAiStream() {
     sceneId: string, 
     profileId?: string, 
     promptTemplateId?: string,
-    instruction?: string
+    instruction?: string,
+    taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE' = 'DRAFT',
+    originalVersion?: string,
+    revisedVersion?: string
   ) => {
     if (!sceneId || !bookId) return;
     
@@ -24,23 +27,33 @@ export function useAiStream() {
     setPromptBlueprint(null);
 
     try {
-      // 1. Fetch the blueprint first for transparency (NOW WITH PERSONA, TEMPLATE & INSTRUCTION)
+      // 1. Fetch the blueprint first for transparency
       const { system, prompt } = await generatePromptData(
         bookId, 
         sceneId, 
         profileId, 
         promptTemplateId,
-        'DRAFT',
+        taskType,
         undefined,
-        instruction
+        instruction,
+        originalVersion,
+        revisedVersion
       );
       setPromptBlueprint(`[SYSTEM INSTRUCTION]\n${system}\n\n[USER PROMPT]\n${prompt}`);
 
-      // 2. Start the actual stream with optional profileId, promptTemplateId and instruction
+      // 2. Start the actual stream
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sceneId, profileId, promptTemplateId, instruction })
+        body: JSON.stringify({ 
+          sceneId, 
+          profileId, 
+          promptTemplateId, 
+          instruction, 
+          taskType,
+          originalVersion,
+          revisedVersion
+        })
       });
 
       if (!response.ok) {

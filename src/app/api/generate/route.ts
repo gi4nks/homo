@@ -12,6 +12,9 @@ export async function POST(req: Request) {
     const profileId = reqBody.profileId;
     const promptTemplateId = reqBody.promptTemplateId;
     const instruction = reqBody.instruction;
+    const taskType = reqBody.taskType || 'DRAFT';
+    const originalVersion = reqBody.originalVersion;
+    const revisedVersion = reqBody.revisedVersion;
 
     if (!sceneId) return new Response('Missing sceneId', { status: 400 });
 
@@ -28,15 +31,17 @@ export async function POST(req: Request) {
       sceneId, 
       profileId, 
       promptTemplateId, 
-      'DRAFT',
+      taskType,
       undefined,
-      instruction
+      instruction,
+      originalVersion,
+      revisedVersion
     );
 
     const settings = await getAppSettings();
     const model = getAIModel(settings.activeProvider, settings.activeModelName);
 
-    const result = await streamText({
+    const result = streamText({
       model,
       system,
       prompt,

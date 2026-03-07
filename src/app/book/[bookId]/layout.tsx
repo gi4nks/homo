@@ -37,7 +37,7 @@ export default async function BookLayout({
 
   return (
     <div className="flex flex-col h-full bg-base-50 overflow-hidden text-base-content selection:bg-primary/20">
-      <WorkspaceSync title={book.title} />
+      <WorkspaceSync title={book.title} chapters={formattedBook.chapters} />
       
       <div className="flex-grow flex overflow-hidden">
         <WorkspaceShell>

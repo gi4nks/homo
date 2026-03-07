@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { updateSceneContent, getSceneById, updateScene } from '@/app/actions/scene.actions';
 import { updateAppSettings, getPromptTemplates } from '@/app/actions/ai.actions';
+import { createSnapshot } from '@/app/actions/snapshot.actions';
 import { 
   Undo2, 
   Redo2, 
@@ -13,6 +14,7 @@ import {
   Maximize2,
   Cpu,
   Layout,
+  Lock
 } from 'lucide-react';
 import Editor, { EditorRef } from './Editor';
 import { useAiStream } from '@/hooks/useAiStream';
@@ -65,6 +67,10 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const updateSceneWordCount = useWorkspaceStore(state => state.updateSceneWordCount);
   const { activeProvider, activeModelName, setAiEngine } = useWorkspaceStore();
 
+  const chapters = useWorkspaceStore(state => state.chapters);
+  const storeScene = chapters.flatMap(c => c.scenes).find(s => s.id === sceneId);
+  const isLocked = storeScene?.isLocked || false;
+
   const [content, setContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [wordCount, setWordCount] = useState(0);
@@ -86,14 +92,10 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (!isAiLoading && sceneId) {
+        if (!isAiLoading && sceneId && !isLocked) {
           const targetTemplate = overridePromptTemplateId || activePromptTemplateId || DEFAULT_DRAFTING_TEMPLATE_ID;
-          startStream(
-            bookId, 
-            sceneId, 
-            overrideAiProfileId || activeAiProfileId || undefined, 
-            targetTemplate
-          );
+          createSnapshot(sceneId, contentRef.current, "Auto: Pre-AI");
+          startStream(bookId, sceneId, overrideAiProfileId || activeAiProfileId || undefined, targetTemplate);
         }
       }
       if (e.key === 'Escape') {
@@ -103,9 +105,10 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [bookId, sceneId, isAiLoading, startStream, toggleFocusMode, overridePromptTemplateId, activePromptTemplateId, overrideAiProfileId, activeAiProfileId]);
+  }, [bookId, sceneId, isAiLoading, isLocked, startStream, toggleFocusMode, overridePromptTemplateId, activePromptTemplateId, overrideAiProfileId, activeAiProfileId]);
 
   const handleQuickSwitchModel = async (newModel: string) => {
+    if (isLocked) return;
     let provider = 'GOOGLE';
     if (newModel.startsWith('claude')) provider = 'ANTHROPIC';
     else if (newModel.startsWith('gpt') || newModel.startsWith('o1')) provider = 'OPENAI';
@@ -118,7 +121,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   };
 
   const handleScenePromptTemplateChange = async (id: string | null) => {
-    if (!sceneId) return;
+    if (!sceneId || isLocked) return;
     const val = id || null;
     setActivePromptTemplateId(val);
     await updateScene(sceneId, { defaultPromptTemplateId: val });
@@ -159,7 +162,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
 
   const debouncedContent = useDebounce(content || '', 1500);
   useEffect(() => {
-    if (isAiLoading) return;
+    if (isAiLoading || isLocked) return;
     const performSave = async () => {
       if (sceneId && debouncedContent !== lastSavedRef.current && !isLoading) {
         setSaveStatus(true, null);
@@ -177,9 +180,10 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
       }
     };
     performSave();
-  }, [debouncedContent, sceneId, setUnsavedChanges, isLoading, setSaveStatus, isAiLoading, updateSceneWordCount]);
+  }, [debouncedContent, sceneId, setUnsavedChanges, isLoading, setSaveStatus, isAiLoading, isLocked, updateSceneWordCount]);
 
   const handleContentChange = (newContent: string) => {
+    if (isLocked) return;
     setContent(newContent);
     contentRef.current = newContent;
     setUnsavedChanges(true);
@@ -223,6 +227,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
             sceneId={sceneId}
             activeAiProfileId={activeAiProfileId}
             activePromptTemplateId={activePromptTemplateId}
+            isLocked={isLocked}
             onChange={handleContentChange} 
           />
         </div>
@@ -233,6 +238,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
           error={aiError}
           promptBlueprint={promptBlueprint}
           onAccept={() => {
+            if (isLocked) return;
             const formattedAppend = `<p></p><p>${aiProposal.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br />')}</p>`;
             editorRef.current?.insertContent(formattedAppend);
             if (sceneId) {
@@ -252,97 +258,99 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
         />
       </main>
 
-      <footer className="bg-base-200/80 backdrop-blur-md p-2 px-6 flex justify-between items-center border-t border-base-300 shrink-0 z-20 h-12">
-        {/* LEFT: WORD COUNT & SELECTORS */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-base-content/40 mr-2">
-            <div className="w-1.5 h-1.5 bg-primary rounded-full opacity-50"></div>
+      <footer className="bg-base-200/80 backdrop-blur-md p-2 px-6 flex justify-between items-center border-t border-base-300 shrink-0 z-20 h-14">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-base-content/40">
+            <div className={`w-1.5 h-1.5 rounded-full ${isLocked ? 'bg-error animate-pulse' : 'bg-primary opacity-50'}`}></div>
             <span><span className="text-base-content font-mono tracking-tighter text-[11px]">{wordCount.toLocaleString()}</span> Words</span>
+            {isLocked && <span className="ml-2 text-error flex items-center gap-1 font-black"><Lock size={10} /> Locked</span>}
           </div>
           
-          <div className="flex items-center gap-2">
-            {/* ENGINE SELECTOR */}
-            <FooterSelector
-              label="Engine"
-              value={getActiveModelDisplayName()}
-              icon={Cpu}
-              dropdownWidth="w-64"
-            >
-              {AI_MODELS.map(group => (
-                <React.Fragment key={group.provider}>
-                  <li className="menu-title px-4 py-2 text-[8px] font-black uppercase opacity-30 tracking-widest">{group.provider}</li>
-                  {group.models.map(m => (
-                    <li key={m.id}>
-                      <button 
-                        className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activeModelName === m.id ? 'bg-primary/10 text-primary' : ''}`}
-                        onClick={() => handleQuickSwitchModel(m.id)}
-                      >
-                        {m.name}
-                      </button>
-                    </li>
-                  ))}
-                  <div className="divider my-1 opacity-5"></div>
-                </React.Fragment>
-              ))}
-            </FooterSelector>
+          {!isLocked && (
+            <div className="flex items-center gap-2 bg-base-300/30 p-1 rounded-xl border border-base-300/50">
+              <FooterSelector
+                label="Engine"
+                value={getActiveModelDisplayName()}
+                icon={Cpu}
+                dropdownWidth="w-64"
+              >
+                {AI_MODELS.map(group => (
+                  <React.Fragment key={group.provider}>
+                    <li className="menu-title px-4 py-2 text-[8px] font-black uppercase opacity-30 tracking-widest">{group.provider}</li>
+                    {group.models.map(m => (
+                      <li key={m.id}>
+                        <button 
+                          className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activeModelName === m.id ? 'bg-primary/10 text-primary' : ''}`}
+                          onClick={() => handleQuickSwitchModel(m.id)}
+                        >
+                          {m.name}
+                        </button>
+                      </li>
+                    ))}
+                    <div className="divider my-1 opacity-5"></div>
+                  </React.Fragment>
+                ))}
+              </FooterSelector>
 
-            {/* TEMPLATE SELECTOR */}
-            <FooterSelector
-              label="Template"
-              value={activeTemplate?.name || 'Default'}
-              icon={Layout}
-              dropdownWidth="w-64"
-            >
-              <li className="menu-title px-4 py-2 text-[8px] font-black uppercase opacity-30 tracking-widest">Logic Selection</li>
-              <li>
-                <button 
-                  className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${!activePromptTemplateId ? 'bg-primary/10 text-primary' : ''}`}
-                  onClick={() => handleScenePromptTemplateChange(null)}
-                >
-                  System Default Logic
-                </button>
-              </li>
-              <div className="divider my-1 opacity-5"></div>
-              {promptTemplates.map(t => (
-                <li key={t.id}>
+              <FooterSelector
+                label="Template"
+                value={activeTemplate?.name || 'Default'}
+                icon={Layout}
+                dropdownWidth="w-64"
+              >
+                <li className="menu-title px-4 py-2 text-[8px] font-black uppercase opacity-30 tracking-widest">Logic Selection</li>
+                <li>
                   <button 
-                    className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activePromptTemplateId === t.id ? 'bg-primary/10 text-primary' : ''}`}
-                    onClick={() => handleScenePromptTemplateChange(t.id)}
+                    className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${!activePromptTemplateId ? 'bg-primary/10 text-primary' : ''}`}
+                    onClick={() => handleScenePromptTemplateChange(null)}
                   >
-                    {t.name}
+                    System Default Logic
                   </button>
                 </li>
-              ))}
-            </FooterSelector>
-          </div>
+                <div className="divider my-1 opacity-5"></div>
+                {promptTemplates.map(t => (
+                  <li key={t.id}>
+                    <button 
+                      className={`text-xs font-bold py-2 px-4 rounded-xl mx-1 my-0.5 ${activePromptTemplateId === t.id ? 'bg-primary/10 text-primary' : ''}`}
+                      onClick={() => handleScenePromptTemplateChange(t.id)}
+                    >
+                      {t.name}
+                    </button>
+                  </li>
+                ))}
+              </FooterSelector>
+
+              {!isAiLoading && <AiProfileSelector />}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT: PERSONA & UTILITIES */}
         <div className="flex items-center gap-2">
-          {!isAiLoading && <AiProfileSelector />}
-          
-          <button 
-            type="button"
-            className={`btn btn-sm btn-square ${isAiLoading ? 'btn-disabled bg-base-300' : 'btn-primary shadow-lg shadow-primary/20 hover:scale-105'} transition-all`}
-            onMouseDown={(e) => { 
-              e.preventDefault(); 
-              if (!isAiLoading && sceneId) {
-                const targetTemplate = overridePromptTemplateId || activePromptTemplateId || DEFAULT_DRAFTING_TEMPLATE_ID;
-                startStream(bookId, sceneId, overrideAiProfileId || activeAiProfileId || undefined, targetTemplate); 
-              }
-            }}
-            disabled={isAiLoading}
-            title="Generate AI (Cmd+Enter)"
-          >
-            {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-          </button>
+          {!isLocked && (
+            <button 
+              type="button"
+              className={`btn btn-sm btn-square ${isAiLoading ? 'btn-disabled bg-base-300' : 'btn-primary shadow-lg shadow-primary/20 hover:scale-105'} transition-all`}
+              onMouseDown={(e) => { 
+                e.preventDefault(); 
+                if (!isAiLoading && sceneId) {
+                  const targetTemplate = overridePromptTemplateId || activePromptTemplateId || DEFAULT_DRAFTING_TEMPLATE_ID;
+                  createSnapshot(sceneId, contentRef.current, "Auto: Pre-AI");
+                  startStream(bookId, sceneId, overrideAiProfileId || activeAiProfileId || undefined, targetTemplate); 
+                }
+              }}
+              disabled={isAiLoading}
+              title="Generate AI (Cmd+Enter)"
+            >
+              {isAiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            </button>
+          )}
           
           <div className="divider divider-horizontal mx-1 h-4 opacity-10"></div>
           
           <div className="join bg-base-300/30 p-0.5 rounded-lg border border-base-300/50">
             <button className={`btn btn-ghost btn-xs btn-square join-item transition-all ${isFocusMode ? 'text-primary' : 'text-base-content/30 hover:text-primary'}`} onClick={toggleFocusMode} title="Focus Mode (Esc)"><Maximize2 size={14} /></button>
-            <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-base-100 text-base-content/30" title="Undo" onClick={() => editorRef.current?.undo()}><Undo2 size={14} /></button>
-            <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-base-100 text-base-content/30" title="Redo" onClick={() => editorRef.current?.redo()}><Redo2 size={14} /></button>
+            <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-base-100 text-base-content/30" title="Undo" onClick={() => editorRef.current?.undo()} disabled={isLocked}><Undo2 size={14} /></button>
+            <button className="btn btn-ghost btn-xs btn-square join-item hover:bg-base-100 text-base-content/30" title="Redo" onClick={() => editorRef.current?.redo()} disabled={isLocked}><Redo2 size={14} /></button>
           </div>
         </div>
       </footer>

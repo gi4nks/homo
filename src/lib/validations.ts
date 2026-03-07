@@ -6,21 +6,17 @@ export const CloneItemSchema = z.object({ id: IdSchema });
 
 export const ReorderItemSchema = z.object({
   id: IdSchema,
-  orderIndex: z.number().int().nonnegative(),
+  orderIndex: z.number().int()
 });
+
 export const ReorderPayloadSchema = z.array(ReorderItemSchema);
 
-export type IdInput = z.infer<typeof IdSchema>;
-export type CloneItemInput = z.infer<typeof CloneItemSchema>;
-export type ReorderItemInput = z.infer<typeof ReorderItemSchema>;
-export type ReorderPayloadInput = z.infer<typeof ReorderPayloadSchema>;
-
-// --- BOOK VALIDATIONS ---
+// --- BOOK ---
 export const CreateBookSchema = z.object({
-  title: z.string().min(1, "Title is required").max(255),
+  title: z.string().min(1).max(255),
   genre: z.string().max(100).optional(),
-  status: z.string().max(50).optional(),
   tone: z.string().max(5000).optional(),
+  status: z.string().max(50).optional(),
 });
 export type CreateBookInput = z.infer<typeof CreateBookSchema>;
 
@@ -41,64 +37,28 @@ export const UpdateBookBibleSchema = z.object({
 });
 export type UpdateBookBibleInput = z.infer<typeof UpdateBookBibleSchema>;
 
-// --- CHAPTER VALIDATIONS ---
+// --- CHAPTER ---
 export const CreateChapterSchema = z.object({
   bookId: IdSchema,
-  title: z.string().min(1, "Title is required").max(255),
+  title: z.string().min(1).max(255),
 });
 export type CreateChapterInput = z.infer<typeof CreateChapterSchema>;
 
 export const UpdateChapterSchema = z.object({
   id: IdSchema,
   title: z.string().min(1).max(255).optional(),
-  chapterGoal: z.string().optional(),
   orderIndex: z.number().int().positive().optional(),
   chapterNumber: z.number().int().positive().optional(),
+  chapterGoal: z.string().optional(),
 });
 export type UpdateChapterInput = z.infer<typeof UpdateChapterSchema>;
 
-export const ReorderChaptersSchema = z.object({
-  bookId: IdSchema,
-  updates: z.array(z.object({
-    id: IdSchema,
-    orderIndex: z.number().int().positive(),
-  })),
-});
-export type ReorderChaptersInput = z.infer<typeof ReorderChaptersSchema>;
-
-// --- CHARACTER VALIDATIONS ---
-export const CharacterSchema = z.object({
-  bookId: IdSchema,
-  name: z.string().min(1, "Name is required").max(255),
-  role: z.string().max(100).optional(),
-  description: z.string().optional(),
-});
-export type CharacterInput = z.infer<typeof CharacterSchema>;
-
-export const UpdateCharacterSchema = CharacterSchema.partial().extend({
-  id: IdSchema
-});
-export type UpdateCharacterInput = z.infer<typeof UpdateCharacterSchema>;
-
-// --- SCENE VALIDATIONS (Existing) ---
+// --- SCENE ---
 export const CreateSceneSchema = z.object({
   chapterId: IdSchema,
   title: z.string().min(1).max(255),
 });
 export type CreateSceneInput = z.infer<typeof CreateSceneSchema>;
-
-export const UpdateSceneSchema = z.object({
-  id: IdSchema,
-  title: z.string().min(1).max(255).optional(),
-  content: z.string().optional(),
-  promptGoals: z.string().optional(),
-  narrativePosition: z.string().optional(),
-  orderIndex: z.number().int().positive().optional(),
-  sceneNumber: z.number().int().positive().optional(),
-  defaultAiProfileId: z.string().uuid().nullable().optional(),
-  defaultPromptTemplateId: z.string().uuid().nullable().optional(),
-});
-export type UpdateSceneInput = z.infer<typeof UpdateSceneSchema>;
 
 export const UpdateSceneContentSchema = z.object({
   id: IdSchema,
@@ -112,25 +72,43 @@ export const UpdateScenePromptGoalsSchema = z.object({
 });
 export type UpdateScenePromptGoalsInput = z.infer<typeof UpdateScenePromptGoalsSchema>;
 
-export const ReorderScenesSchema = z.object({
-  chapterId: IdSchema,
-  updates: z.array(z.object({
-    id: IdSchema,
-    orderIndex: z.number().int().positive(),
-  })),
+export const UpdateSceneSchema = z.object({
+  id: IdSchema,
+  title: z.string().min(1).max(255).optional(),
+  content: z.string().optional(),
+  promptGoals: z.string().optional(),
+  narrativePosition: z.string().optional(),
+  orderIndex: z.number().int().positive().optional(),
+  sceneNumber: z.number().int().positive().optional(),
+  isLocked: z.boolean().optional(),
+  defaultAiProfileId: z.string().uuid().nullable().optional(),
+  defaultPromptTemplateId: z.string().uuid().nullable().optional(),
 });
-export type ReorderScenesInput = z.infer<typeof ReorderScenesSchema>;
+export type UpdateSceneInput = z.infer<typeof UpdateSceneSchema>;
 
 export const ToggleCharacterInSceneSchema = z.object({
   sceneId: IdSchema,
   characterId: IdSchema,
 });
-export type ToggleCharacterInSceneInput = z.infer<typeof ToggleCharacterInSceneSchema>;
 
-// --- GENRE VALIDATIONS ---
+// --- CHARACTER ---
+export const CharacterSchema = z.object({
+  bookId: IdSchema,
+  name: z.string().min(1).max(100),
+  role: z.string().max(100).optional(),
+  description: z.string().max(1000).optional(),
+});
+export type CharacterInput = z.infer<typeof CharacterSchema>;
+
+export const UpdateCharacterSchema = CharacterSchema.partial().extend({
+  id: IdSchema
+});
+export type UpdateCharacterInput = z.infer<typeof UpdateCharacterSchema>;
+
+// --- GENRE CONFIG ---
 export const GenreConfigSchema = z.object({
-  genreName: z.string().min(1, "Genre name is required").max(100),
-  customPromptRules: z.string().min(1, "Rules are required"),
+  genreName: z.string().min(1).max(100),
+  customPromptRules: z.string().max(5000),
 });
 export type GenreConfigInput = z.infer<typeof GenreConfigSchema>;
 

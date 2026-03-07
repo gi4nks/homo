@@ -78,7 +78,9 @@ model Scene {
   orderIndex  Int
   sceneNumber Int         @default(1)
   wordCount   Int         @default(0)
+  isLocked    Boolean     @default(false)
   characters  Character[] @relation("SceneCast")
+  snapshots   Snapshot[]
 
   // NEW: Scene-level AI Default Configuration
   defaultAiProfileId      String?
@@ -148,4 +150,13 @@ enum AIProvider {
   OPENAI
   ANTHROPIC
   CUSTOM
+}
+
+model Snapshot {
+  id        String   @id @default(uuid())
+  scene     Scene    @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  sceneId   String
+  content   String
+  createdAt DateTime @default(now())
+  label     String?
 }
