@@ -2,6 +2,22 @@ import { create } from 'zustand';
 
 export type WorkspaceTab = 'book' | 'chapter' | 'scene';
 
+export interface Scene {
+  id: string;
+  title: string;
+  orderIndex: number;
+  sceneNumber: number;
+  wordCount: number;
+}
+
+export interface Chapter {
+  id: string;
+  title: string;
+  orderIndex: number;
+  chapterNumber: number;
+  scenes: Scene[];
+}
+
 interface ModalState {
   isOpen: boolean;
   mode: string;
@@ -23,7 +39,21 @@ interface WorkspaceState {
   // Global Metadata (Not in URL)
   activeBookTitle: string | null;
   activeTab: WorkspaceTab;
+  
+  // AI Engine Info
+  activeProvider: string | null;
+  activeModelName: string | null;
+  
+  // Sidebar State (Single Source of Truth)
+  chapters: Chapter[];
+  
+  // Scene Default (Persistent in DB)
   activeAiProfileId: string | null;
+  activePromptTemplateId: string | null;
+
+  // Local Override (Ephemeral for immediate action)
+  overrideAiProfileId: string | null;
+  overridePromptTemplateId: string | null;
 
   // UI State
   leftPanelOpen: boolean;
@@ -42,7 +72,19 @@ interface WorkspaceState {
   // Actions
   setActiveBookTitle: (title: string) => void;
   setActiveTab: (tab: WorkspaceTab) => void;
+  setAiEngine: (provider: string, model: string) => void;
+  
+  // Actions for Sidebar
+  setChapters: (chapters: Chapter[]) => void;
+  updateSceneWordCount: (sceneId: string, wordCount: number) => void;
+  
+  // Actions for Scene Defaults
   setActiveAiProfileId: (id: string | null) => void;
+  setActivePromptTemplateId: (id: string | null) => void;
+
+  // Actions for Local Overrides
+  setOverrideAiProfileId: (id: string | null) => void;
+  setOverridePromptTemplateId: (id: string | null) => void;
 
   toggleLeftPanel: () => void;
   toggleRightPanel: () => void;
@@ -65,7 +107,16 @@ interface WorkspaceState {
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   activeBookTitle: null,
   activeTab: 'scene',
+  
+  activeProvider: null,
+  activeModelName: null,
+
+  chapters: [],
+
   activeAiProfileId: null,
+  activePromptTemplateId: null,
+  overrideAiProfileId: null,
+  overridePromptTemplateId: null,
 
   leftPanelOpen: true,
   rightPanelOpen: true,
@@ -92,7 +143,29 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
 
   setActiveBookTitle: (title) => set({ activeBookTitle: title }),
   setActiveTab: (tab) => set({ activeTab: tab }),
-  setActiveAiProfileId: (id) => set({ activeAiProfileId: id }),
+  setAiEngine: (provider, model) => set({ activeProvider: provider, activeModelName: model }),
+  
+  setChapters: (chapters) => set({ chapters }),
+  updateSceneWordCount: (sceneId, wordCount) => set((state) => ({
+    chapters: state.chapters.map(chapter => ({
+      ...chapter,
+      scenes: chapter.scenes.map(scene => 
+        scene.id === sceneId ? { ...scene, wordCount } : scene
+      )
+    }))
+  })),
+
+  setActiveAiProfileId: (id) => set({ 
+    activeAiProfileId: id,
+    overrideAiProfileId: id // Sync override to new default
+  }),
+  setActivePromptTemplateId: (id) => set({ 
+    activePromptTemplateId: id,
+    overridePromptTemplateId: id // Sync override to new default
+  }),
+
+  setOverrideAiProfileId: (id) => set({ overrideAiProfileId: id }),
+  setOverridePromptTemplateId: (id) => set({ overridePromptTemplateId: id }),
 
   toggleLeftPanel: () => set((state) => ({ leftPanelOpen: !state.leftPanelOpen })),
 
@@ -136,7 +209,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   resetWorkspace: () => set({
     activeBookTitle: null,
     activeAiProfileId: null,
+    activePromptTemplateId: null,
+    overrideAiProfileId: null,
+    overridePromptTemplateId: null,
     hasUnsavedChanges: false,
+    chapters: [],
+    activeProvider: null,
+    activeModelName: null,
   })
 }));
-

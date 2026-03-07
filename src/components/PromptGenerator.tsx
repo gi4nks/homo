@@ -13,6 +13,7 @@ interface PromptGeneratorProps {
 const PromptGenerator: React.FC<PromptGeneratorProps> = ({ bookId, currentSceneId }) => {
   const modalRef = useRef<HTMLDialogElement>(null);
   const activeAiProfileId = useWorkspaceStore(state => state.activeAiProfileId);
+  const activePromptTemplateId = useWorkspaceStore(state => state.activePromptTemplateId);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [copied, setCopied] = useState(false);
@@ -25,8 +26,13 @@ const PromptGenerator: React.FC<PromptGeneratorProps> = ({ bookId, currentSceneI
     
     startTransition(async () => {
       try {
-        const generatedPrompt = await generatePromptData(bookId, currentSceneId, activeAiProfileId || undefined);
-        setPrompt(generatedPrompt);
+        const { system, prompt } = await generatePromptData(
+          bookId, 
+          currentSceneId, 
+          activeAiProfileId || undefined,
+          activePromptTemplateId || undefined
+        );
+        setPrompt(`[SYSTEM INSTRUCTION]\n${system}\n\n[USER PROMPT]\n${prompt}`);
       } catch (err) {
         setError('Failed to generate prompt. Please try again.');
       }

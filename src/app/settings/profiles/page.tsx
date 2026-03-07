@@ -3,18 +3,15 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { getAiProfiles, createAiProfile, updateAiProfile, deleteAiProfile } from '@/app/actions/ai.actions';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
-import Link from 'next/link';
 import { 
   Plus, 
   Trash2, 
   Edit2, 
-  ChevronLeft, 
   Cpu, 
-  ShieldCheck, 
-  Wand2, 
   Save, 
   X,
-  Star
+  Star,
+  Download
 } from 'lucide-react';
 
 export default function AiProfilesPage() {
@@ -56,61 +53,82 @@ export default function AiProfilesPage() {
     if (res.success) loadProfiles();
   };
 
-  return (
-    <main className="h-screen bg-slate-50 flex flex-col relative text-slate-900 overflow-hidden">
-      <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.06]">
-         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-400 rounded-full blur-[150px]"></div>
-         <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-400 rounded-full blur-[150px]"></div>
-      </div>
+  const handleExportMarkdown = async () => {
+    try {
+      const response = await fetch('/api/export-profiles');
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `homo_personas_export_${new Date().toISOString().split('T')[0]}.md`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Failed to export personas');
+    }
+  };
 
-      <header className="px-8 py-6 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <Link href="/settings" className="btn btn-ghost btn-sm btn-circle"><ChevronLeft size={20} /></Link>
-          <div>
-            <h2 className="text-2xl font-black tracking-tighter uppercase flex items-center gap-3">
-              <Cpu className="text-blue-600" /> AI Personas
-            </h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Writing Behavior Profiles</p>
-          </div>
+  return (
+    <div className="p-12 w-full space-y-12 h-full flex flex-col overflow-hidden">
+      
+      <header className="flex justify-between items-center shrink-0">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight text-base-content uppercase">AI Personas</h1>
+          <p className="text-sm font-medium text-base-content/60 uppercase tracking-widest">Writing Behavior Profiles</p>
         </div>
-        <button onClick={() => { setEditingConfig(null); setIsModalOpen(true); }} className="btn btn-primary btn-sm px-6 font-black uppercase tracking-widest rounded-full shadow-lg shadow-blue-500/20">
-          <Plus size={16} className="mr-1" /> New Persona
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleExportMarkdown} 
+            className="btn btn-outline btn-sm px-6 font-black uppercase tracking-widest rounded-md border-base-300 hover:bg-base-200"
+          >
+            <Download size={16} className="mr-1" /> Export Markdown
+          </button>
+          <button onClick={() => { setEditingConfig(null); setIsModalOpen(true); }} className="btn btn-primary btn-sm px-6 font-black uppercase tracking-widest rounded-md shadow-lg shadow-primary/20">
+            <Plus size={16} className="mr-1" /> New Persona
+          </button>
+        </div>
       </header>
 
-      <div className="p-8 lg:p-12 flex-grow z-10 overflow-y-auto custom-scrollbar pb-32">
+      <div className="flex-grow overflow-y-auto custom-scrollbar pb-20">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-40 opacity-20 animate-pulse"><Cpu size={48} /><p className="text-xs font-black uppercase mt-4">Initializing Neural Link...</p></div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
             {profiles.map((profile) => (
-              <div key={profile.id} className={`card bg-white border ${profile.isDefault ? 'border-blue-500 shadow-xl' : 'border-slate-200 shadow-sm'} hover:shadow-md transition-all rounded-2xl group overflow-hidden`}>
+              <div key={profile.id} className={`card bg-base-100 border ${profile.isDefault ? 'border-primary shadow-lg ring-1 ring-primary/20' : 'border-base-200 shadow-sm'} hover:shadow-md transition-all rounded-xl group overflow-hidden flex flex-col h-full`}>
                 {profile.isDefault && (
-                  <div className="bg-blue-500 text-white text-[8px] font-black uppercase tracking-widest py-1 text-center">Active Default</div>
+                  <div className="bg-primary text-primary-content text-[8px] font-black uppercase tracking-widest py-1.5 text-center shrink-0">Active Default</div>
                 )}
-                <div className="card-body p-6 gap-4">
-                  <div className="flex justify-between items-start">
+                <div className="card-body p-8 gap-6 flex flex-col flex-1">
+                  <div className="flex justify-between items-start shrink-0">
                     <div className="flex flex-col">
-                      <h3 className="font-black text-lg uppercase tracking-tight text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">{profile.name}</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{profile.description || 'No description'}</p>
+                      <h3 className="font-bold text-lg uppercase tracking-tight text-base-content group-hover:text-primary transition-colors line-clamp-1">{profile.name}</h3>
+                      <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mt-1">{profile.description || 'No description'}</p>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingConfig(profile); setIsModalOpen(true); }} className="btn btn-ghost btn-xs btn-square"><Edit2 size={14} /></button>
-                      <button onClick={() => handleDelete(profile.id, profile.name)} className="btn btn-ghost btn-xs btn-square text-error"><Trash2 size={14} /></button>
+                      {!profile.isDefault && (
+                        <button onClick={() => handleDelete(profile.id, profile.name)} className="btn btn-ghost btn-xs btn-square text-error"><Trash2 size={14} /></button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 h-24 overflow-hidden relative group/inner">
-                    <p className="text-[11px] leading-relaxed text-slate-500 font-mono italic">"{profile.systemPrompt}"</p>
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-50 to-transparent opacity-60"></div>
+                  <div className="bg-base-200/50 rounded-xl p-5 border border-base-300 h-28 overflow-hidden relative group/inner shrink-0">
+                    <p className="text-[11px] leading-relaxed text-base-content/70 font-mono italic">"{profile.systemPrompt}"</p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-base-200/80 to-transparent opacity-60"></div>
                   </div>
 
-                  <div className="card-actions justify-end mt-2">
+                  <div className="flex justify-between items-center pt-4 border-t border-base-200 mt-auto">
                     <button 
                       onClick={() => handleToggleDefault(profile)}
-                      className={`btn btn-xs rounded-full px-4 font-black uppercase tracking-widest transition-all ${profile.isDefault ? 'btn-disabled bg-blue-100 text-blue-500' : 'btn-ghost hover:bg-blue-50 text-slate-400 hover:text-blue-600'}`}
+                      disabled={profile.isDefault}
+                      className={`btn btn-xs rounded-md px-4 font-black uppercase tracking-widest transition-all ${profile.isDefault ? 'btn-disabled bg-primary/10 text-primary border-none' : 'btn-ghost hover:bg-primary/10 text-base-content/30 hover:text-primary'}`}
                     >
-                      <Star size={10} className="mr-1.5" /> Set Default
+                      <Star size={10} className={`mr-1.5 ${profile.isDefault ? 'fill-primary' : ''}`} /> {profile.isDefault ? 'Primary' : 'Set as Primary'}
                     </button>
                   </div>
                 </div>
@@ -127,7 +145,7 @@ export default function AiProfilesPage() {
           profile={editingProfile} 
         />
       )}
-    </main>
+    </div>
   );
 }
 
@@ -156,10 +174,10 @@ function ProfileModal({ isOpen, onClose, profile }: { isOpen: boolean, onClose: 
 
   return (
     <div className="modal modal-open z-[100]">
-      <div className="modal-box max-w-2xl p-0 rounded-3xl shadow-2xl border border-slate-200 overflow-hidden bg-white">
+      <div className="modal-box max-w-2xl p-0 rounded-xl shadow-2xl border border-base-300 overflow-hidden bg-base-100">
         <form onSubmit={handleSubmit}>
-          <div className="px-8 py-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-blue-600 flex items-center gap-2">
+          <div className="px-8 py-6 border-b border-base-300 bg-base-200/50 flex justify-between items-center">
+            <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
               <Cpu size={16} /> {profile ? 'Refine Persona' : 'Forge New Persona'}
             </h3>
             <button type="button" className="btn btn-ghost btn-xs btn-circle" onClick={onClose}><X size={18} /></button>
@@ -175,7 +193,7 @@ function ProfileModal({ isOpen, onClose, profile }: { isOpen: boolean, onClose: 
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="e.g. The Grim Scribe" 
-                  className="input input-bordered input-sm w-full font-bold focus:input-primary rounded-xl" 
+                  className="input input-bordered input-sm w-full font-bold focus:input-primary rounded-md bg-base-100" 
                 />
               </div>
               <div className="form-control w-full">
@@ -185,7 +203,7 @@ function ProfileModal({ isOpen, onClose, profile }: { isOpen: boolean, onClose: 
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   placeholder="Quick summary of the style" 
-                  className="input input-bordered input-sm w-full font-bold focus:input-primary rounded-xl" 
+                  className="input input-bordered input-sm w-full font-bold focus:input-primary rounded-md bg-base-100" 
                 />
               </div>
             </div>
@@ -198,7 +216,7 @@ function ProfileModal({ isOpen, onClose, profile }: { isOpen: boolean, onClose: 
                 value={formData.systemPrompt}
                 onChange={(e) => setFormData({...formData, systemPrompt: e.target.value})}
                 placeholder="How should the AI behave? e.g. 'Use dark imagery, short sentences...'" 
-                className="textarea textarea-bordered w-full font-mono text-[11px] leading-relaxed focus:textarea-primary rounded-xl custom-scrollbar" 
+                className="textarea textarea-bordered w-full font-mono text-[11px] leading-relaxed focus:textarea-primary rounded-md custom-scrollbar bg-base-100" 
               />
               <label className="label">
                 <span className="label-text-alt opacity-40 italic">This prompt will be injected at the absolute top of all AI generations.</span>
@@ -218,15 +236,15 @@ function ProfileModal({ isOpen, onClose, profile }: { isOpen: boolean, onClose: 
             </div>
           </div>
 
-          <div className="px-8 py-6 bg-slate-50 flex justify-end gap-4 border-t border-slate-100">
+          <div className="px-8 py-6 bg-base-200/50 flex justify-end gap-4 border-t border-base-300">
             <button type="button" className="btn btn-ghost btn-sm font-black uppercase tracking-widest opacity-50" onClick={onClose}>Cancel</button>
-            <button type="submit" className={`btn btn-primary btn-sm px-10 font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 ${isPending ? 'loading' : ''}`} disabled={isPending}>
+            <button type="submit" className={`btn btn-primary btn-sm px-10 font-black uppercase tracking-widest shadow-lg shadow-primary/20 ${isPending ? 'loading' : ''}`} disabled={isPending}>
               <Save size={14} className="mr-2" /> {profile ? 'Update Soul' : 'Ignite Persona'}
             </button>
           </div>
         </form>
       </div>
-      <div className="modal-backdrop bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="modal-backdrop bg-black/40 backdrop-blur-sm" onClick={onClose}></div>
     </div>
   );
 }

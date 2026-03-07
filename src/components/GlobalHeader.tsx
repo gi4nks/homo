@@ -14,12 +14,14 @@ import {
   LogOut,
   RefreshCw,
   CheckCircle2,
+  Cpu,
   PanelLeftOpen,
   PanelLeftClose,
   PanelRightOpen,
   PanelRightClose,
   FileDown,
-  Loader2
+  Loader2,
+  FileCode
 } from 'lucide-react';
 import ScenePromptGeneratorWrapper from './ScenePromptGeneratorWrapper';
 
@@ -31,61 +33,50 @@ export default function GlobalHeader() {
     rightPanelOpen, toggleRightPanel
   } = useWorkspaceStore();
   
-  const [theme, setTheme] = useState('corporate');
-  const [isExporting, setIsExporting] = useState(false);
+  const [theme, setTheme] = useState('emerald');
 
   // Theme Logic
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'corporate';
+    const savedTheme = localStorage.getItem('theme') || 'emerald';
     setTheme(savedTheme);
     document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
   const toggleTheme = () => {
-    const newTheme = theme === 'corporate' ? 'dark' : 'corporate';
+    const newTheme = theme === 'emerald' ? 'dark' : 'emerald';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  // Safe Extraction of Book ID from URL
   const isBookWorkspace = pathname.startsWith('/book/');
-  const pathParts = pathname.split('/');
-  const derivedBookId = isBookWorkspace ? pathParts[2] : null;
+  const pathParts = pathname.split('/').filter(Boolean);
+  const derivedBookId = isBookWorkspace ? pathParts[1] : null;
 
-  const handleExport = async () => {
-    const targetId = derivedBookId;
-    
-    if (!targetId) {
-      alert("Error: Missing manuscript ID");
-      return;
-    }
-
-    setIsExporting(true);
-    try {
-      const result = await compileManuscript(targetId);
+  // Optimized Breadcrumb Logic
+  const breadcrumbItems = [];
+  
+  // Rule: If in workspace, we only show HOME > WORKSPACE > [BOOK TITLE]
+  if (isBookWorkspace) {
+    breadcrumbItems.push({ label: 'Workspace', path: '/book' });
+    breadcrumbItems.push({ label: activeBookTitle || 'Current Book', path: `/book/${derivedBookId}` });
+  } else {
+    // Normal mapping for other pages (settings, etc)
+    let currentPath = '';
+    pathParts.forEach((part) => {
+      currentPath += `/${part}`;
+      let label = part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, ' ');
       
-      if (!result.success) {
-        throw new Error(result.error || 'Server reported failure');
-      }
+      // Custom label mappings
+      if (part === 'prompts') label = 'Prompt CMS';
+      if (part === 'profiles') label = 'AI Personas';
+      if (part === 'genres') label = 'Genre Rules';
+      if (part === 'ai-models') label = 'AI Models';
+      if (part === 'settings') label = 'Settings';
 
-      const blob = new Blob([result.data || ""], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${activeBookTitle?.replace(/\s+/g, '_') || 'manuscript'}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err: any) {
-      alert(`Export failed: ${err.message}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const isSettings = pathname.startsWith('/settings');
+      breadcrumbItems.push({ label, path: currentPath });
+    });
+  }
 
   return (
     <header className="navbar bg-base-100 border-b border-base-200 sticky top-0 z-50 px-6 min-h-16 shrink-0 shadow-sm">
@@ -109,8 +100,15 @@ export default function GlobalHeader() {
         <div className="text-[10px] breadcrumbs font-black uppercase tracking-widest text-base-content/40 ml-2 overflow-visible">
           <ul>
             <li><Link href="/" className="flex items-center gap-1.5 hover:text-primary"><Home size={12} /> Home</Link></li>
-            {isBookWorkspace && <li><span className="text-base-content/80 whitespace-nowrap">{activeBookTitle || 'Book'}</span></li>}
-            {isSettings && <li><Link href="/settings" className="hover:text-primary">Settings</Link></li>}
+            {breadcrumbItems.map((item, i) => (
+              <li key={item.path}>
+                {i === breadcrumbItems.length - 1 ? (
+                  <span className="text-base-content/80 whitespace-nowrap">{item.label}</span>
+                ) : (
+                  <Link href={item.path} className="hover:text-primary whitespace-nowrap">{item.label}</Link>
+                )}
+              </li>
+            ))}
           </ul>
         </div>
       </div>
@@ -121,18 +119,6 @@ export default function GlobalHeader() {
       <div className="navbar-end gap-3 flex-grow">
         {isBookWorkspace && (
           <>
-            <button 
-              className={`btn btn-outline btn-sm font-black uppercase tracking-widest text-[9px] gap-2 rounded-md transition-all ${isExporting ? 'bg-base-300 pointer-events-none' : 'hover:bg-primary hover:text-primary-content'}`}
-              onClick={handleExport}
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                <><RefreshCw size={14} className="animate-spin" /> Exporting...</>
-              ) : (
-                <><FileDown size={14} /> Export .md</>
-              )}
-            </button>
-
             <div className="flex items-center gap-3 px-4 py-1.5 bg-base-200/50 rounded-full border border-base-300 animate-in fade-in duration-300 shrink-0">
               {saveStatus.isSaving ? (
                 <div className="flex items-center gap-2 text-primary font-black text-[9px] uppercase tracking-widest">
@@ -155,15 +141,16 @@ export default function GlobalHeader() {
         <div className="divider divider-horizontal mx-0 h-6 opacity-10"></div>
 
         <button className="btn btn-ghost btn-sm btn-circle shrink-0" onClick={toggleTheme}>
-          {theme === 'corporate' ? <Moon size={18} /> : <Sun size={18} />}
+          {theme === 'emerald' ? <Moon size={18} /> : <Sun size={18} />}
         </button>
 
         <div className="dropdown dropdown-end shrink-0">
           <label tabIndex={0} className="btn btn-ghost btn-sm p-0 h-auto min-h-0 hover:bg-transparent">
             <div className="avatar placeholder"><div className="bg-neutral text-neutral-content rounded-lg w-8 shadow-sm"><User size={16} /></div></div>
           </label>
-          <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow-2xl menu menu-sm dropdown-content bg-base-100 rounded-xl border border-base-200 w-52 font-bold uppercase text-[10px] tracking-widest text-slate-900">
+          <ul tabIndex={0} className="mt-3 z-[1] p-2 shadow-2xl menu menu-sm dropdown-content bg-base-100 rounded-xl border border-base-200 w-52 font-bold uppercase text-[10px] tracking-widest text-base-content">
             <li><Link href="/settings" className="py-3 px-4 flex items-center gap-3"><Settings size={14} /> System Settings</Link></li>
+            <li><Link href="/settings/ai-models" className="py-3 px-4 flex items-center gap-3"><Cpu size={14} /> AI Engines</Link></li>
             <div className="divider my-0 opacity-10"></div>
             <li><Link href="/" className="py-3 px-4 flex items-center gap-3 text-error"><LogOut size={14} /> Sign Out</Link></li>
           </ul>

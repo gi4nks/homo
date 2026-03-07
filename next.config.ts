@@ -5,16 +5,23 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   turbopack: {},
 
+  env: {
+    NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version || '0.5.0',
+  },
+
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
         ...config.watchOptions,
         ignored: [
           '**/node_modules', 
+          '**/.next',
           '**/*.db', 
-          '**/*.sqlite', 
           '**/*.db-journal', 
-          '**/prisma/*.db'
+          '**/*.sqlite', 
+          '**/*.sqlite-journal',
+          '**/prisma/*.db*',
+          '**/dev.db*'
         ],
       };
     }

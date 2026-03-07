@@ -2,12 +2,13 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { CharacterSchema, UpdateCharacterSchema, IdSchema } from '@/lib/validations';
-import { ActionResponse } from './scene.actions';
+import { CharacterSchema, UpdateCharacterSchema, IdSchema, CharacterInput, UpdateCharacterInput } from '@/lib/validations';
+import { ActionResponse } from '@/lib/types';
+import { Character } from '@prisma/client';
 
-export async function createCharacter(bookId: string, data: any): Promise<ActionResponse> {
+export async function createCharacter(bookId: string, data: Partial<CharacterInput>): Promise<ActionResponse<Character>> {
   const validated = CharacterSchema.safeParse({ bookId, ...data });
-  if (!validated.success) return { success: false, error: "Validation failed", validationErrors: validated.error.format() };
+  if (!validated.success) return { success: false, error: "Validation failed", fieldErrors: validated.error.flatten().fieldErrors };
 
   try {
     const character = await prisma.character.create({ 
@@ -20,9 +21,9 @@ export async function createCharacter(bookId: string, data: any): Promise<Action
   }
 }
 
-export async function updateCharacter(id: string, data: any): Promise<ActionResponse> {
+export async function updateCharacter(id: string, data: Partial<UpdateCharacterInput>): Promise<ActionResponse<Character>> {
   const validated = UpdateCharacterSchema.safeParse({ id, ...data });
-  if (!validated.success) return { success: false, error: "Invalid character data" };
+  if (!validated.success) return { success: false, error: "Invalid character data", fieldErrors: validated.error.flatten().fieldErrors };
 
   try {
     const { id: charId, ...payload } = validated.data;
@@ -37,7 +38,7 @@ export async function updateCharacter(id: string, data: any): Promise<ActionResp
   }
 }
 
-export async function deleteCharacter(id: string): Promise<ActionResponse> {
+export async function deleteCharacter(id: string): Promise<ActionResponse<{ id: string }>> {
   const validated = IdSchema.safeParse(id);
   if (!validated.success) return { success: false, error: "Invalid ID" };
 

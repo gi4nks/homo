@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Sparkles, Terminal, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface AiProposalBoxProps {
   proposal: string;
@@ -103,10 +104,14 @@ export default function AiProposalBox({
       )}
       
       {/* MAIN TEXT AREA (DYNAMIC HEIGHT) */}
-      <div className={`overflow-y-auto custom-scrollbar p-1 text-[15px] leading-[1.8] text-base-content/90 font-serif whitespace-pre-wrap italic transition-all duration-500 ${
+      <div className={`overflow-y-auto custom-scrollbar p-1 text-[15px] leading-[1.8] text-base-content/90 transition-all duration-500 ${
         isExpanded ? 'flex-grow' : 'max-h-64'
       }`}>
-        {proposal || (isLoading ? <span className="opacity-30 italic">Connecting to engine...</span> : null)}
+        {proposal ? (
+          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none font-serif italic">
+            <ReactMarkdown>{proposal}</ReactMarkdown>
+          </div>
+        ) : (isLoading ? <span className="opacity-30 italic">Connecting to engine...</span> : null)}
         {error && <div className="text-error mt-2 font-sans text-xs">Error: {error}</div>}
       </div>
 

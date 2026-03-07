@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useRef } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useParams } from 'next/navigation';
-import { updateScenePromptGoals, toggleCharacterInScene } from '@/app/actions/scene.actions';
-import { Sparkles, Users, RefreshCw, Target, X } from 'lucide-react';
+import { updateScenePromptGoals, toggleCharacterInScene, updateScene } from '@/app/actions/scene.actions';
+import { Sparkles, Users, RefreshCw, Target, X, Library, Download, Cpu, Terminal as TerminalIcon, ShieldCheck, Database, PenTool } from 'lucide-react';
+import { compileManuscript, getPromptTemplates } from '@/app/actions/book.actions';
+import { getAiProfiles } from '@/app/actions/ai.actions';
+import InspectorSection from './InspectorSection';
 
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -18,39 +21,167 @@ function useDebounce(value: string, delay: number) {
 export default function SceneTab({ book }: { book: any }) {
   const params = useParams();
   const activeSceneId = params.sceneId as string;
+  const activeBookId = params.bookId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
+  const activeAiProfileId = useWorkspaceStore(state => state.activeAiProfileId);
+  const setActiveAiProfileId = useWorkspaceStore(state => state.setActiveAiProfileId);
+  const activePromptTemplateId = useWorkspaceStore(state => state.activePromptTemplateId);
+  const setActivePromptTemplateId = useWorkspaceStore(state => state.setActivePromptTemplateId);
+
+  const [aiProfiles, setAiProfiles] = useState<any[]>([]);
+  const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
   const [isPending, startTransition] = useTransition();
+  const [isCompiling, setIsCompiling] = useState(false);
+
+  useEffect(() => {
+    getAiProfiles().then(setAiProfiles);
+    getPromptTemplates().then(setPromptTemplates);
+  }, []);
 
   const scene = book.chapters
     .flatMap((ch: any) => ch.scenes)
     .find((s: any) => s.id === activeSceneId);
 
+  useEffect(() => {
+    if (scene) {
+      const targetProfile = scene.defaultAiProfileId || book.defaultAiProfileId || null;
+      const targetTemplate = scene.defaultPromptTemplateId || book.defaultPromptTemplateId || null;
+      setActiveAiProfileId(targetProfile);
+      setActivePromptTemplateId(targetTemplate);
+    }
+  }, [scene?.id, book.defaultAiProfileId, book.defaultPromptTemplateId, setActiveAiProfileId, setActivePromptTemplateId]);
+
+  const handleSceneAiProfileChange = async (id: string | null) => {
+    if (!activeSceneId) return;
+    const val = id || null;
+    setActiveAiProfileId(val);
+    await updateScene(activeSceneId, { defaultAiProfileId: val });
+  };
+
+  const handleScenePromptTemplateChange = async (id: string | null) => {
+    if (!activeSceneId) return;
+    const val = id || null;
+    setActivePromptTemplateId(val);
+    await updateScene(activeSceneId, { defaultPromptTemplateId: val });
+  };
+
   const [localGoals, setLocalSceneGoals] = useState(scene?.promptGoals || '');
+  const [localNarrativePosition, setLocalNarrativePosition] = useState(scene?.narrativePosition || 'Metà');
   const debouncedGoals = useDebounce(localGoals, 1500);
+  
+  const isDirtyRef = useRef(false);
+  const lastKnownSceneId = useRef(activeSceneId);
 
   useEffect(() => {
-    if (debouncedGoals !== (scene?.promptGoals || '')) {
-      if (!activeSceneId) return;
+    if (scene?.promptGoals !== localGoals || scene?.narrativePosition !== localNarrativePosition) {
+      if (!isDirtyRef.current || lastKnownSceneId.current !== activeSceneId) {
+        setLocalSceneGoals(scene?.promptGoals || '');
+        setLocalNarrativePosition(scene?.narrativePosition || 'Metà');
+        isDirtyRef.current = false;
+        lastKnownSceneId.current = activeSceneId;
+      }
+    }
+  }, [activeSceneId, scene?.promptGoals, scene?.narrativePosition]);
+
+  useEffect(() => {
+    const hasChanged = debouncedGoals !== (scene?.promptGoals || '');
+    if (!debouncedGoals && !isDirtyRef.current) return;
+
+    if (isDirtyRef.current && hasChanged && activeSceneId) {
       setSaveStatus(true, null);
       startTransition(async () => {
         const res = await updateScenePromptGoals(activeSceneId, debouncedGoals);
-        setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
+        if (res.success) {
+          setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          isDirtyRef.current = false;
+        } else {
+          setSaveStatus(false, "Sync Error");
+        }
       });
     }
   }, [debouncedGoals, activeSceneId, setSaveStatus, scene?.promptGoals]);
 
+  const handleNarrativePositionChange = async (val: string) => {
+    setLocalNarrativePosition(val);
+    if (!activeSceneId) return;
+    setSaveStatus(true, null);
+    const res = await updateScene(activeSceneId, { narrativePosition: val });
+    if (res.success) {
+      setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    }
+  };
+
+  const handleCompileScene = async () => {
+    if (!activeBookId || !activeSceneId) return;
+    setIsCompiling(true);
+    try {
+      const res = await compileManuscript(activeBookId, undefined, activeSceneId);
+      if (res.success && res.data) {
+        const blob = new Blob([res.data], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Scene_${scene?.sceneNumber || 'X'}_${scene?.title.replace(/\s+/g, '_')}.md`;
+        a.click();
+      }
+    } catch (err) { console.error(err); } finally { setIsCompiling(false); }
+  };
+
   if (!activeSceneId) return null;
 
   return (
-    <div className="p-4 space-y-3 animate-in fade-in slide-in-from-right-2 duration-300">
+    <div className="p-4 space-y-1 animate-in fade-in slide-in-from-right-2 duration-300 pb-32">
       
-      {/* SECTION: SCENE CAST */}
-      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
-        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-secondary">
-          <Users size={12} /> Scene Cast
-        </summary>
-        <div className="collapse-content space-y-3">
-          <div className="flex flex-wrap gap-2 pt-2">
+      {/* SECTION 1: AI DIRECTING */}
+      <InspectorSection title="AI Directing" icon={ShieldCheck} defaultOpen={false}>
+        <div className="form-control w-full">
+          <label className="label py-1"><span className="label-text font-black text-[9px] uppercase opacity-40">Tono della scena (Regista)</span></label>
+          <select 
+            className="select select-bordered select-sm w-full font-bold"
+            value={activeAiProfileId || ""}
+            onChange={(e) => handleSceneAiProfileChange(e.target.value || null)}
+          >
+            <option value="">Predefinito del Volume</option>
+            {aiProfiles.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
+          </select>
+        </div>
+
+        <div className="form-control w-full">
+          <label className="label py-1"><span className="label-text font-black text-[9px] uppercase opacity-40">Posizione Narrativa</span></label>
+          <select 
+            className="select select-bordered select-sm w-full font-bold"
+            value={localNarrativePosition}
+            onChange={(e) => handleNarrativePositionChange(e.target.value)}
+          >
+            <option value="Inizio">Inizio (Beginning)</option>
+            <option value="Metà">Metà (Middle/Rising Action)</option>
+            <option value="Climax">Climax</option>
+            <option value="Epilogo">Epilogo (Resolution)</option>
+          </select>
+        </div>
+
+        <div className="divider my-1 opacity-10"></div>
+
+        <InspectorSection title="Advanced Prompt Engineering" icon={TerminalIcon} collapsible={false}>
+          <div className="form-control w-full">
+            <label className="label py-1"><span className="label-text font-black text-[9px] uppercase opacity-40">Template Override</span></label>
+            <select 
+              className="select select-bordered select-xs w-full font-bold"
+              value={activePromptTemplateId || ""}
+              onChange={(e) => handleScenePromptTemplateChange(e.target.value || null)}
+            >
+              <option value="">Global Pipeline</option>
+              {promptTemplates.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+            </select>
+          </div>
+        </InspectorSection>
+      </InspectorSection>
+
+      {/* SECTION 2: THE STAGE */}
+      <InspectorSection title="The Stage" icon={Users} defaultOpen={true}>
+        <div className="form-control w-full">
+          <label className="label py-1"><span className="label-text font-black text-[9px] uppercase opacity-40 text-base-content/60">Chi è presente qui? (Cast)</span></label>
+          <div className="flex flex-wrap gap-2 pt-1">
             {book.charactersList?.map((char: any) => {
               const isSelected = scene?.characters.some((sc: any) => sc.id === char.id);
               return (
@@ -72,26 +203,42 @@ export default function SceneTab({ book }: { book: any }) {
             <p className="text-[10px] opacity-40 italic py-2">No characters defined in Book Tab.</p>
           )}
         </div>
-      </details>
+      </InspectorSection>
 
-      {/* SECTION: IMMEDIATE ACTION */}
-      <details className="collapse collapse-arrow bg-base-200/50 border border-base-300 shadow-sm" open>
-        <summary className="collapse-title text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
-          <Sparkles size={12} /> Immediate Action (Beats)
-        </summary>
-        <div className="collapse-content pt-2">
+      {/* SECTION 3: THE ACTION */}
+      <InspectorSection title="The Action" icon={PenTool} defaultOpen={true}>
+        <div className="form-control w-full">
+          <label className="label py-1">
+            <span className="label-text font-black text-[9px] uppercase opacity-40 flex items-center gap-2">
+              <Sparkles size={10} /> Cosa succede in questa scena? (Beats)
+            </span>
+          </label>
           <textarea 
-            className="textarea textarea-ghost w-full min-h-[250px] text-[11px] leading-relaxed bg-base-100 p-4 border-none focus:ring-0 resize-none custom-scrollbar" 
-            placeholder="Describe exactly what happens in this scene for the AI..." 
+            className="textarea textarea-bordered w-full min-h-[250px] font-bold text-xs leading-relaxed"
+            placeholder="Scrivi in modo sintetico le azioni in ordine cronologico..." 
             value={localGoals} 
-            onChange={(e) => setLocalSceneGoals(e.target.value)} 
+            onChange={(e) => {
+              isDirtyRef.current = true;
+              setLocalSceneGoals(e.target.value);
+            }} 
           />
           <div className="flex justify-end gap-2 mt-2 opacity-20">
              <RefreshCw size={10} className={isPending ? 'animate-spin' : ''} />
-             <span className="text-[8px] font-black uppercase tracking-tighter">Auto-syncing Context</span>
+             <span className="text-[8px] font-black uppercase tracking-tighter text-base-content/60">Auto-syncing Context</span>
           </div>
         </div>
-      </details>
+      </InspectorSection>
+
+      {/* SECTION 4: DATA & EXPORTS */}
+      <InspectorSection title="Data & Exports" icon={Database} defaultOpen={false}>
+        <button 
+          onClick={handleCompileScene}
+          disabled={isCompiling}
+          className={`btn btn-secondary btn-sm rounded-xl font-black uppercase tracking-widest text-[10px] w-full shadow-lg shadow-primary/20 ${isCompiling ? 'loading' : ''}`}
+        >
+          <Download size={14} className="mr-2" /> Export Scene (.md)
+        </button>
+      </InspectorSection>
 
     </div>
   );

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useId } from 'react';
-import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import React, { useState, useEffect, useTransition, useId, useMemo } from 'react';
+import { useWorkspaceStore, Chapter, Scene } from '@/store/useWorkspaceStore';
 import { 
   deleteChapter, 
   reorderChapters 
@@ -42,13 +42,11 @@ import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
-interface Scene { id: string; title: string; content: string; orderIndex: number; sceneNumber: number; }
-interface Chapter { id: string; title: string; orderIndex: number; chapterNumber: number; scenes: Scene[]; }
-
 const FormattedNumber = ({ value }: { value: number }) => {
-  const [formatted, setFormatted] = useState<string>(value.toString());
-  useEffect(() => { setFormatted(value.toLocaleString()); }, [value]);
-  return <>{formatted}</>;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return <>{value}</>;
+  return <>{value.toLocaleString()}</>;
 };
 
 // --- SORTABLE SCENE ---
@@ -63,11 +61,6 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: scene.id });
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 100 : 'auto' };
-
-  const countWords = (html: string = '') => {
-    const text = html.replace(/<[^>]*>?/gm, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-    return text ? text.split(/\s+/).length : 0;
-  };
 
   return (
     <li ref={setNodeRef} style={style} className={`w-full list-none ${isDragging ? 'opacity-50' : ''}`}>
@@ -87,7 +80,7 @@ const SortableScene = ({ scene, chapterId, bookId }: { scene: Scene, chapterId: 
               <span className="opacity-40 font-mono mr-1">{scene.sceneNumber}.</span> {scene.title}
            </span>
            <span className="text-[9px] opacity-40 font-bold mt-1 uppercase tracking-tighter">
-             <FormattedNumber value={countWords(scene.content)} /> words
+             <FormattedNumber value={scene.wordCount || 0} /> words
            </span>
         </div>
         <div className="flex gap-0.5 opacity-0 group-hover/scene:opacity-100 transition-opacity shrink-0">
@@ -122,13 +115,13 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
   const style = { transform: CSS.Transform.toString(transform), transition, zIndex: isDragging ? 100 : 'auto' };
 
   const getChapterWordCount = () => {
-    return chapter.scenes.reduce((acc, scene) => {
-      const text = scene.content.replace(/<[^>]*>?/gm, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      return acc + (text ? text.split(/\s+/).length : 0);
-    }, 0);
+    return chapter.scenes.reduce((acc, scene) => acc + (scene.wordCount || 0), 0);
   };
 
-  const sortedScenes = [...chapter.scenes].sort((a,b) => a.orderIndex - b.orderIndex);
+  const sortedScenes = useMemo(() => 
+    [...chapter.scenes].sort((a,b) => a.orderIndex - b.orderIndex),
+    [chapter.scenes]
+  );
 
   return (
     <li ref={setNodeRef} style={style} className={`w-full list-none ${isDragging ? 'opacity-50' : ''}`}>
@@ -202,18 +195,27 @@ const SortableChapter = ({ chapter, bookId, expandedChapters, setExpandedChapter
 };
 
 // --- MAIN COMPONENT ---
-const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: () => void }> = ({ bookId, chapters, onClose }) => {
+const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: () => void }> = ({ bookId, chapters: initialChapters, onClose }) => {
   const params = useParams();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
-  const [localChapters, setLocalChapters] = useState<Chapter[]>(chapters);
+  
+  const chapters = useWorkspaceStore(state => state.chapters);
+  const setChapters = useWorkspaceStore(state => state.setChapters);
   const openMetadataModal = useWorkspaceStore(state => state.openMetadataModal);
   const id = useId();
 
+  const isDashboardActive = !params.chapterId && !params.sceneId;
+
+  // Sync initial chapters to store
   useEffect(() => { 
     setMounted(true);
-    setLocalChapters([...chapters].sort((a,b) => a.orderIndex - b.orderIndex)); 
-  }, [chapters]);
+    // Initialize store with initial data from server
+    if (initialChapters) {
+      setChapters([...initialChapters].sort((a,b) => a.orderIndex - b.orderIndex)); 
+    }
+  }, [initialChapters, setChapters]);
 
   useEffect(() => {
     if (params.chapterId) {
@@ -230,35 +232,35 @@ const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: 
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const activeChapterIndex = localChapters.findIndex(c => c.id === active.id);
-    const overChapterIndex = localChapters.findIndex(c => c.id === over.id);
+    const activeChapterIndex = chapters.findIndex(c => c.id === active.id);
+    const overChapterIndex = chapters.findIndex(c => c.id === over.id);
 
     if (activeChapterIndex !== -1 && overChapterIndex !== -1) {
-      const oldOrder = [...localChapters];
-      const newOrder = arrayMove(localChapters, activeChapterIndex, overChapterIndex);
-      setLocalChapters(newOrder); 
+      const oldOrder = [...chapters];
+      const newOrder = arrayMove(chapters, activeChapterIndex, overChapterIndex);
+      setChapters(newOrder); 
       const updates = newOrder.map((c, i) => ({ id: c.id, orderIndex: i + 1 }));
       const res = await reorderChapters(bookId, updates);
       if (!res.success) {
-        setLocalChapters(oldOrder);
+        setChapters(oldOrder);
         alert("Failed to reorder: " + res.error);
       }
       return;
     }
 
-    for (const chapter of localChapters) {
+    for (const chapter of chapters) {
       const activeSceneIndex = chapter.scenes.findIndex(s => s.id === active.id);
       const overSceneIndex = chapter.scenes.findIndex(s => s.id === over.id);
 
       if (activeSceneIndex !== -1 && overSceneIndex !== -1) {
         const oldScenes = [...chapter.scenes];
         const newScenes = arrayMove(chapter.scenes, activeSceneIndex, overSceneIndex);
-        const updatedChapters = localChapters.map(c => c.id === chapter.id ? { ...c, scenes: newScenes } : c);
-        setLocalChapters(updatedChapters); 
+        const updatedChapters = chapters.map(c => c.id === chapter.id ? { ...c, scenes: newScenes } : c);
+        setChapters(updatedChapters); 
         const updates = newScenes.map((s, i) => ({ id: s.id, orderIndex: i + 1 }));
         const res = await reorderScenes(chapter.id, updates);
         if (!res.success) {
-          setLocalChapters(localChapters);
+          setChapters(chapters);
           alert("Failed to reorder: " + res.error);
         }
         break;
@@ -266,12 +268,20 @@ const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: 
     }
   };
 
+  const sortedChapters = useMemo(() => 
+    [...chapters].sort((a,b) => a.orderIndex - b.orderIndex),
+    [chapters]
+  );
+
   return (
     <div className="flex flex-col h-full overflow-hidden bg-base-100">
       <div className="p-4 border-b border-base-200 bg-base-100/50 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-2 text-primary font-black">
+        <div 
+          className={`flex items-center gap-2 cursor-pointer transition-all hover:text-primary ${isDashboardActive ? 'text-primary' : 'text-base-content font-black opacity-70 hover:opacity-100'}`}
+          onClick={() => router.push(`/book/${bookId}`)}
+        >
            <BarChart3 size={14} />
-           <span className="text-[10px] uppercase tracking-[0.2em]">Manuscript</span>
+           <span className="text-[10px] uppercase tracking-[0.2em]">Project Central</span>
         </div>
         <div className="flex gap-1">
            <button className="btn btn-ghost btn-xs btn-square opacity-50 hover:opacity-100" onClick={onClose} title="Close Navigator">
@@ -291,8 +301,8 @@ const ChapterManager: React.FC<{ bookId: string; chapters: Chapter[]; onClose?: 
         ) : (
           <DndContext id={id} sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <ul className="flex flex-col gap-1.5 w-full pb-32">
-              <SortableContext items={localChapters.map(c => c.id)} strategy={verticalListSortingStrategy}>
-                {localChapters.map((chapter) => (
+              <SortableContext items={sortedChapters.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                {sortedChapters.map((chapter) => (
                   <SortableChapter 
                     key={chapter.id} 
                     chapter={chapter} 

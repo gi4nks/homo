@@ -17,6 +17,9 @@ model Book {
   genreSpecificGoals String          @default("") 
   characters         String          @default("") 
   tone               String          @default("Professional")
+  styleReference     String          @default("")
+  authorialIntent    String          @default("")
+  loreConstraints    String          @default("")
   status             String          @default("Planning")
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
@@ -26,6 +29,15 @@ model Book {
   // Relation to existing GenreConfig system
   genreConfig        GenreConfig?    @relation(fields: [genreId], references: [id])
   genreId            String?
+
+  // NEW: Dynamic Prompt CMS relations
+  defaultPromptTemplateId String?
+  defaultPromptTemplate   PromptTemplate? @relation(fields: [defaultPromptTemplateId], references: [id])
+  
+  defaultAiProfileId      String?
+  defaultAiProfile        AiProfile?      @relation(fields: [defaultAiProfileId], references: [id])
+
+  targetWordCount    Int?            @default(80000)
 }
 
 model Character {
@@ -33,7 +45,7 @@ model Character {
   book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
   bookId      String
   name        String
-  role        String   @default("") // New field
+  role        String   @default("")
   description String   @default("")
   scenes      Scene[]  @relation("SceneCast")
   createdAt   DateTime @default(now())
@@ -62,9 +74,18 @@ model Scene {
   title       String
   content     String      @default("")
   promptGoals String      @default("")
+  narrativePosition String @default("Metà")
   orderIndex  Int
   sceneNumber Int         @default(1)
+  wordCount   Int         @default(0)
   characters  Character[] @relation("SceneCast")
+
+  // NEW: Scene-level AI Default Configuration
+  defaultAiProfileId      String?
+  defaultAiProfile        AiProfile?      @relation(fields: [defaultAiProfileId], references: [id])
+  defaultPromptTemplateId String?
+  defaultPromptTemplate   PromptTemplate? @relation(fields: [defaultPromptTemplateId], references: [id])
+
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -77,7 +98,7 @@ model GenreConfig {
   customPromptRules String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  books             Book[]   // Opposite relation field added here
+  books             Book[]
 }
 
 model AiProfile {
@@ -88,4 +109,43 @@ model AiProfile {
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  books        Book[]   // Default for books
+  scenes       Scene[]  // NEW: Back-relation for scene defaults
+}
+
+model PromptTemplate {
+  id                String   @id @default(uuid())
+  name              String   @unique
+  description       String?
+  phase             PipelinePhase @default(DRAFTING)
+  systemInstruction String   // [SYSTEM CORE: HOMO ENGINE] ...
+  contextTemplate   String   // XML tags with {{interpolation}}
+  taskDirective     String   // Specific task logic
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  books             Book[]
+  scenes            Scene[]  // NEW: Back-relation for scene defaults
+}
+
+enum PipelinePhase {
+  WORLDBUILDING
+  OUTLINING
+  DRAFTING
+  EDITING
+  UTILITY
+}
+
+model AppSettings {
+  id               String     @id @default("global")
+  activeProvider   AIProvider @default(GOOGLE)
+  activeModelName  String     @default("gemini-2.5-flash")
+  updatedAt        DateTime   @updatedAt
+}
+
+enum AIProvider {
+  GOOGLE
+  OPENAI
+  ANTHROPIC
+  CUSTOM
 }

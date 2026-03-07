@@ -5,27 +5,39 @@ import { revalidatePath } from 'next/cache';
 import { 
   UpdateSceneContentSchema, 
   UpdateScenePromptGoalsSchema, 
-  ReorderScenesSchema,
   IdSchema,
   CreateSceneSchema,
   UpdateSceneSchema,
   ToggleCharacterInSceneSchema,
   CloneItemSchema,
-  ReorderPayloadSchema
+  ReorderPayloadSchema,
+  CreateSceneInput,
+  UpdateSceneContentInput,
+  UpdateScenePromptGoalsInput,
+  UpdateSceneInput,
 } from '@/lib/validations';
 import { z } from 'zod';
+import { Scene } from '@prisma/client';
+import { ActionResponse } from '@/lib/types';
 
-// --- STANDARDIZED RESPONSE TYPE ---
-
-export type ActionResponse<T = any> = 
-  | { success: true; data: T }
-  | { success: false; error: string; validationErrors?: any };
+// --- UTILITIES ---
+function calculateWordCount(html: string): number {
+  if (!html) return 0;
+  const text = html
+    .replace(/<[^>]*>?/gm, ' ') // Strip HTML tags
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')       // Collapse whitespace
+    .trim();
+  return text ? text.split(/\s+/).length : 0;
+}
 
 // --- SCENE ACTIONS ---
 
-export async function createScene(chapterId: string, title: string): Promise<ActionResponse> {
+export async function createScene(chapterId: string, title: string): Promise<ActionResponse<Scene>> {
   const validated = CreateSceneSchema.safeParse({ chapterId, title });
-  if (!validated.success) return { success: false, error: "Invalid data", validationErrors: validated.error.format() };
+  if (!validated.success) {
+    return { success: false, error: "Invalid data", fieldErrors: validated.error.flatten().fieldErrors };
+  }
 
   try {
     const chapter = await prisma.chapter.findUnique({ where: { id: validated.data.chapterId } });
@@ -53,14 +65,20 @@ export async function createScene(chapterId: string, title: string): Promise<Act
   }
 }
 
-export async function updateSceneContent(id: string, content: string): Promise<ActionResponse> {
+export async function updateSceneContent(id: string, content: string): Promise<ActionResponse<Scene>> {
   const validated = UpdateSceneContentSchema.safeParse({ id, content });
-  if (!validated.success) return { success: false, error: "Invalid ID or Content" };
+  if (!validated.success) {
+    return { success: false, error: "Invalid ID or Content", fieldErrors: validated.error.flatten().fieldErrors };
+  }
 
   try {
+    const wordCount = calculateWordCount(validated.data.content);
     const scene = await prisma.scene.update({
       where: { id: validated.data.id },
-      data: { content: validated.data.content },
+      data: { 
+        content: validated.data.content,
+        wordCount: wordCount
+      },
       include: { chapter: true }
     });
     revalidatePath(`/book/${scene.chapter.bookId}`);
@@ -70,9 +88,11 @@ export async function updateSceneContent(id: string, content: string): Promise<A
   }
 }
 
-export async function updateScenePromptGoals(id: string, promptGoals: string): Promise<ActionResponse> {
+export async function updateScenePromptGoals(id: string, promptGoals: string): Promise<ActionResponse<Scene>> {
   const validated = UpdateScenePromptGoalsSchema.safeParse({ id, promptGoals });
-  if (!validated.success) return { success: false, error: "Invalid data" };
+  if (!validated.success) {
+    return { success: false, error: "Invalid data", fieldErrors: validated.error.flatten().fieldErrors };
+  }
 
   try {
     const scene = await prisma.scene.update({
@@ -87,7 +107,7 @@ export async function updateScenePromptGoals(id: string, promptGoals: string): P
   }
 }
 
-export async function deleteScene(id: string): Promise<ActionResponse> {
+export async function deleteScene(id: string): Promise<ActionResponse<{ id: string }>> {
   const validated = IdSchema.safeParse(id);
   if (!validated.success) return { success: false, error: "Invalid ID" };
 
@@ -116,7 +136,7 @@ export async function deleteScene(id: string): Promise<ActionResponse> {
   }
 }
 
-export async function reorderScenes(chapterId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse> {
+export async function reorderScenes(chapterId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse<null>> {
   const validatedParent = IdSchema.safeParse(chapterId);
   const validatedUpdates = ReorderPayloadSchema.safeParse(updates);
 
@@ -139,7 +159,7 @@ export async function reorderScenes(chapterId: string, updates: z.infer<typeof R
   }
 }
 
-export async function toggleCharacterInScene(sceneId: string, characterId: string): Promise<ActionResponse> {
+export async function toggleCharacterInScene(sceneId: string, characterId: string): Promise<ActionResponse<{ isPresent: boolean }>> {
   const validated = ToggleCharacterInSceneSchema.safeParse({ sceneId, characterId });
   if (!validated.success) return { success: false, error: "Invalid IDs" };
 
@@ -168,7 +188,7 @@ export async function toggleCharacterInScene(sceneId: string, characterId: strin
   }
 }
 
-export async function getSceneById(id: string): Promise<ActionResponse> {
+export async function getSceneById(id: string): Promise<ActionResponse<Scene>> {
   const validated = IdSchema.safeParse(id);
   if (!validated.success) return { success: false, error: "Invalid Scene ID" };
 
@@ -183,15 +203,23 @@ export async function getSceneById(id: string): Promise<ActionResponse> {
   }
 }
 
-export async function updateScene(id: string, data: any): Promise<ActionResponse> {
+export async function updateScene(id: string, data: Partial<UpdateSceneInput>): Promise<ActionResponse<Scene>> {
   const validated = UpdateSceneSchema.safeParse({ id, ...data });
-  if (!validated.success) return { success: false, error: "Invalid update data", validationErrors: validated.error.format() };
+  if (!validated.success) {
+    return { success: false, error: "Invalid update data", fieldErrors: validated.error.flatten().fieldErrors };
+  }
 
   try {
     const { id: sceneId, ...payload } = validated.data;
+    const updateData: any = { ...payload };
+
+    if (payload.content !== undefined) {
+      updateData.wordCount = calculateWordCount(payload.content);
+    }
+
     const scene = await prisma.scene.update({
       where: { id: sceneId },
-      data: payload,
+      data: updateData,
       include: { chapter: true }
     });
     revalidatePath(`/book/${scene.chapter.bookId}`);
@@ -201,7 +229,7 @@ export async function updateScene(id: string, data: any): Promise<ActionResponse
   }
 }
 
-export async function cloneScene(id: string): Promise<ActionResponse> {
+export async function cloneScene(id: string): Promise<ActionResponse<Scene>> {
   const validated = CloneItemSchema.safeParse({ id });
   if (!validated.success) return { success: false, error: "Invalid Scene ID" };
 

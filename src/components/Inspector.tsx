@@ -14,9 +14,9 @@ export default function Inspector({ book }: { book: any }) {
   const setActiveTab = useWorkspaceStore((state) => state.setActiveTab);
 
   return (
-    <div className="flex flex-col h-full bg-base-100 border-l border-base-200">
+    <div className="flex flex-col h-full bg-base-200 border-l border-base-300 shadow-inner">
       {/* TABS NAVIGATION */}
-      <div className="tabs tabs-bordered grid grid-cols-3 shrink-0">
+      <div className="tabs tabs-bordered grid grid-cols-3 shrink-0 bg-base-100">
         <button 
           className={`tab h-12 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'book' ? 'tab-active text-primary border-primary' : 'opacity-50'}`}
           onClick={() => setActiveTab('book')}

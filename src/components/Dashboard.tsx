@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useTransition, useMemo, useEffect } from 'react';
-import { createBook, deleteBook } from '@/app/actions/book.actions';
+import { createBook, deleteBook, duplicateBook } from '@/app/actions/book.actions';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -19,12 +19,20 @@ import {
   FileText,
   Calendar,
   Sparkles,
-  X
+  X,
+  Copy
 } from 'lucide-react';
 
-interface Scene { content: string; }
-interface Chapter { scenes: Scene[]; }
-interface Book { id: string; title: string; genre: string; status: string; updatedAt: string; chapters?: Chapter[]; }
+interface Book { 
+  id: string; 
+  title: string; 
+  genre: string; 
+  status: string; 
+  updatedAt: string; 
+  chaptersCount?: number; 
+  scenesCount?: number; 
+  totalWords?: number; 
+}
 
 const FormattedDate = ({ dateString }: { dateString: string }) => {
   const [formatted, setFormatted] = useState<string>('');
@@ -40,22 +48,13 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const countWords = (html: string = '') => {
-    if (!html) return 0;
-    const text = html.replace(/<[^>]*>?/gm, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-    return text ? text.split(' ').length : 0;
-  };
-
   const getBookStats = (book: Book) => {
-    let totalWords = 0; let totalScenes = 0;
-    const totalChapters = book.chapters?.length || 0;
-    if (book.chapters) {
-      book.chapters.forEach(ch => {
-        totalScenes += ch.scenes.length;
-        ch.scenes.forEach(s => { totalWords += countWords(s.content); });
-      });
-    }
-    return { totalWords, readingTime: Math.ceil(totalWords / 200), totalChapters, totalScenes };
+    return { 
+      totalWords: book.totalWords || 0, 
+      readingTime: Math.ceil((book.totalWords || 0) / 200),
+      totalChapters: book.chaptersCount || 0, 
+      totalScenes: book.scenesCount || 0 
+    };
   };
 
   const filteredBooks = useMemo(() => {
@@ -79,6 +78,24 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
         router.push(`/book/${res.data.id}`);
       } else {
         alert(res.error);
+      }
+    });
+  };
+
+  const handleDuplicate = async (id: string, title: string) => {
+    openConfirmModal({
+      title: "Clone Manuscript",
+      message: `Do you want to create a full copy of "${title}"?`,
+      confirmLabel: "Clone",
+      onConfirm: async () => {
+        startTransition(async () => {
+          const res = await duplicateBook(id);
+          if (res.success) {
+            router.refresh();
+          } else {
+            alert(res.error);
+          }
+        });
       }
     });
   };
@@ -146,15 +163,20 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
                     <div className="card-body p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div className={`badge ${getStatusClass(book.status)} badge-xs font-bold uppercase py-2`}>{book.status}</div>
-                        <button className="btn btn-ghost btn-xs btn-circle text-error opacity-0 group-hover:opacity-100 transition-opacity" onClick={async (e) => { 
-                          e.preventDefault(); 
-                          openConfirmModal({
-                            title: "Delete Manuscript",
-                            message: `Are you sure you want to delete "${book.title}"? This will permanently remove all chapters and scenes.`,
-                            confirmLabel: "Delete",
-                            onConfirm: async () => { await deleteBook(book.id); router.refresh(); }
-                          });
-                        }}><Trash2 size={14} /></button>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button className="btn btn-ghost btn-xs btn-circle text-primary" onClick={(e) => { e.preventDefault(); handleDuplicate(book.id, book.title); }} title="Clone manuscript">
+                            <Copy size={14} />
+                          </button>
+                          <button className="btn btn-ghost btn-xs btn-circle text-error" onClick={async (e) => { 
+                            e.preventDefault(); 
+                            openConfirmModal({
+                              title: "Delete Manuscript",
+                              message: `Are you sure you want to delete "${book.title}"? This will permanently remove all chapters and scenes.`,
+                              confirmLabel: "Delete",
+                              onConfirm: async () => { await deleteBook(book.id); router.refresh(); }
+                            });
+                          }} title="Delete manuscript"><Trash2 size={14} /></button>
+                        </div>
                       </div>
                       <Link href={`/book/${book.id}`} className="hover:text-primary transition-colors">
                         <h3 className="font-black text-lg uppercase tracking-tight line-clamp-2 leading-tight h-12 mb-1">{book.title}</h3>
@@ -195,15 +217,22 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
                               <td className="text-center opacity-70 font-bold">{totalChapters} ch / {totalScenes} sc</td>
                               <td className="text-right font-mono text-secondary font-bold">{totalWords.toLocaleString()} <span className="text-[9px] opacity-40 uppercase font-sans">w</span></td>
                               <td className="text-right text-[10px] font-bold opacity-40 uppercase pr-8"><div className="flex items-center justify-end gap-2"><Calendar size={12} /><FormattedDate dateString={book.updatedAt} /></div></td>
-                              <td className="text-right pr-4"><button className="btn btn-ghost btn-xs btn-square text-error opacity-0 group-hover:opacity-100" onClick={async (e) => { 
-                                e.preventDefault(); 
-                                openConfirmModal({
-                                  title: "Delete Manuscript",
-                                  message: `Are you sure you want to delete "${book.title}"? This will permanently remove all chapters and scenes.`,
-                                  confirmLabel: "Delete",
-                                  onConfirm: async () => { await deleteBook(book.id); router.refresh(); }
-                                });
-                              }}><Trash2 size={12} /></button></td>
+                              <td className="text-right pr-4">
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                                  <button className="btn btn-ghost btn-xs btn-square text-primary" onClick={(e) => { e.stopPropagation(); handleDuplicate(book.id, book.title); }} title="Clone manuscript">
+                                    <Copy size={12} />
+                                  </button>
+                                  <button className="btn btn-ghost btn-xs btn-square text-error" onClick={async (e) => { 
+                                    e.stopPropagation(); 
+                                    openConfirmModal({
+                                      title: "Delete Manuscript",
+                                      message: `Are you sure you want to delete "${book.title}"? This will permanently remove all chapters and scenes.`,
+                                      confirmLabel: "Delete",
+                                      onConfirm: async () => { await deleteBook(book.id); router.refresh(); }
+                                    });
+                                  }} title="Delete manuscript"><Trash2 size={12} /></button>
+                                </div>
+                              </td>
                            </tr>
                         );
                      })}

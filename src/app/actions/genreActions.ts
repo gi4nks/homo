@@ -2,8 +2,11 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { GenreConfigSchema, UpdateGenreConfigSchema, IdSchema, GenreConfigInput, UpdateGenreConfigInput } from '@/lib/validations';
+import { ActionResponse } from '@/lib/types';
+import { GenreConfig } from '@prisma/client';
 
-export async function getGenreConfigs() {
+export async function getGenreConfigs(): Promise<GenreConfig[]> {
   try {
     return await prisma.genreConfig.findMany({
       orderBy: { genreName: 'asc' },
@@ -14,41 +17,49 @@ export async function getGenreConfigs() {
   }
 }
 
-export async function createGenreConfig(data: { genreName: string; customPromptRules: string }) {
+export async function createGenreConfig(data: GenreConfigInput): Promise<ActionResponse<GenreConfig>> {
+  const validated = GenreConfigSchema.safeParse(data);
+  if (!validated.success) return { success: false, error: "Validation failed", fieldErrors: validated.error.flatten().fieldErrors };
+
   try {
     const config = await prisma.genreConfig.create({
-      data,
+      data: validated.data,
     });
     revalidatePath('/settings/genres');
-    return config;
+    return { success: true, data: config };
   } catch (error) {
-    console.error('Failed to create genre config:', error);
-    throw new Error('Could not create genre configuration');
+    return { success: false, error: "Could not create genre configuration" };
   }
 }
 
-export async function updateGenreConfig(id: string, data: { genreName: string; customPromptRules: string }) {
+export async function updateGenreConfig(id: string, data: Partial<UpdateGenreConfigInput>): Promise<ActionResponse<GenreConfig>> {
+  const validated = UpdateGenreConfigSchema.safeParse({ id, ...data });
+  if (!validated.success) return { success: false, error: "Invalid data", fieldErrors: validated.error.flatten().fieldErrors };
+
   try {
+    const { id: configId, ...payload } = validated.data;
     const config = await prisma.genreConfig.update({
-      where: { id },
-      data,
+      where: { id: configId },
+      data: payload,
     });
     revalidatePath('/settings/genres');
-    return config;
+    return { success: true, data: config };
   } catch (error) {
-    console.error('Failed to update genre config:', error);
-    throw new Error('Could not update genre configuration');
+    return { success: false, error: "Could not update genre configuration" };
   }
 }
 
-export async function deleteGenreConfig(id: string) {
+export async function deleteGenreConfig(id: string): Promise<ActionResponse<{ id: string }>> {
+  const validated = IdSchema.safeParse(id);
+  if (!validated.success) return { success: false, error: "Invalid ID" };
+
   try {
     await prisma.genreConfig.delete({
-      where: { id },
+      where: { id: validated.data },
     });
     revalidatePath('/settings/genres');
+    return { success: true, data: { id: validated.data } };
   } catch (error) {
-    console.error('Failed to delete genre config:', error);
-    throw new Error('Could not delete genre configuration');
+    return { success: false, error: "Could not delete genre configuration" };
   }
 }

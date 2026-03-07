@@ -1,7 +1,13 @@
 import React from 'react';
 import { getBookById } from '@/app/actions/book.actions';
 import { notFound } from 'next/navigation';
-import LayoutClientInternal from './layout_client_internal';
+import WorkspaceSync from './WorkspaceSync';
+import WorkspaceShell from './WorkspaceShell';
+import SidebarPanel from './SidebarPanel';
+import InspectorPanel from './InspectorPanel';
+import CanvasSection from './CanvasSection';
+import ChapterManager from '@/components/ChapterManager';
+import Inspector from '@/components/Inspector';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,8 +36,27 @@ export default async function BookLayout({
   };
 
   return (
-    <LayoutClientInternal book={formattedBook} params={{ id: bookId }}>
-      {children}
-    </LayoutClientInternal>
+    <div className="flex flex-col h-full bg-base-50 overflow-hidden text-base-content selection:bg-primary/20">
+      <WorkspaceSync title={book.title} />
+      
+      <div className="flex-grow flex overflow-hidden">
+        <WorkspaceShell>
+          {/* 1. LEFT PANEL: NAVIGATOR */}
+          <SidebarPanel>
+            <ChapterManager bookId={bookId} chapters={formattedBook.chapters} />
+          </SidebarPanel>
+
+          {/* 2. CENTER PANEL: THE CANVAS */}
+          <CanvasSection>
+            {children}
+          </CanvasSection>
+
+          {/* 3. RIGHT PANEL: THE INSPECTOR */}
+          <InspectorPanel>
+            <Inspector book={formattedBook} />
+          </InspectorPanel>
+        </WorkspaceShell>
+      </div>
+    </div>
   );
 }

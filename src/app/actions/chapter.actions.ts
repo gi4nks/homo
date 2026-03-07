@@ -2,13 +2,20 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { CreateChapterSchema, UpdateChapterSchema, ReorderChaptersSchema, IdSchema, CloneItemSchema, ReorderPayloadSchema } from '@/lib/validations';
-import { ActionResponse } from './scene.actions';
+import { 
+  CreateChapterSchema, 
+  UpdateChapterSchema, 
+  IdSchema, 
+  ReorderPayloadSchema,
+  UpdateChapterInput
+} from '@/lib/validations';
+import { ActionResponse } from '@/lib/types';
+import { Chapter } from '@prisma/client';
 import { z } from 'zod';
 
-export async function createChapter(bookId: string, title: string): Promise<ActionResponse> {
+export async function createChapter(bookId: string, title: string): Promise<ActionResponse<Chapter>> {
   const validated = CreateChapterSchema.safeParse({ bookId, title });
-  if (!validated.success) return { success: false, error: "Validation failed" };
+  if (!validated.success) return { success: false, error: "Validation failed", fieldErrors: validated.error.flatten().fieldErrors };
 
   try {
     const lastChapter = await prisma.chapter.findFirst({
@@ -32,9 +39,9 @@ export async function createChapter(bookId: string, title: string): Promise<Acti
   }
 }
 
-export async function updateChapter(id: string, data: any): Promise<ActionResponse> {
+export async function updateChapter(id: string, data: Partial<UpdateChapterInput>): Promise<ActionResponse<Chapter>> {
   const validated = UpdateChapterSchema.safeParse({ id, ...data });
-  if (!validated.success) return { success: false, error: "Invalid data" };
+  if (!validated.success) return { success: false, error: "Invalid data", fieldErrors: validated.error.flatten().fieldErrors };
 
   try {
     const { id: chapterId, ...payload } = validated.data;
@@ -50,7 +57,7 @@ export async function updateChapter(id: string, data: any): Promise<ActionRespon
   }
 }
 
-export async function deleteChapter(id: string): Promise<ActionResponse> {
+export async function deleteChapter(id: string): Promise<ActionResponse<{ id: string }>> {
   const validated = IdSchema.safeParse(id);
   if (!validated.success) return { success: false, error: "Invalid ID" };
 
@@ -76,7 +83,7 @@ export async function deleteChapter(id: string): Promise<ActionResponse> {
   }
 }
 
-export async function reorderChapters(bookId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse> {
+export async function reorderChapters(bookId: string, updates: z.infer<typeof ReorderPayloadSchema>): Promise<ActionResponse<null>> {
   const validatedParent = IdSchema.safeParse(bookId);
   const validatedUpdates = ReorderPayloadSchema.safeParse(updates);
 
@@ -98,7 +105,7 @@ export async function reorderChapters(bookId: string, updates: z.infer<typeof Re
   }
 }
 
-export async function updateChapterGoal(id: string, chapterGoal: string): Promise<ActionResponse> {
+export async function updateChapterGoal(id: string, chapterGoal: string): Promise<ActionResponse<Chapter>> {
   const validated = IdSchema.safeParse(id);
   if (!validated.success) return { success: false, error: "Invalid ID" };
 

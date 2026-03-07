@@ -1,6 +1,6 @@
-import { google } from '@ai-sdk/google';
 import { streamText } from 'ai';
-import { generatePromptData } from '@/app/actions/ai.actions';
+import { generatePromptData, getAppSettings } from '@/app/actions/ai.actions';
+import { getAIModel } from '@/lib/ai-factory';
 import prisma from '@/lib/prisma';
 
 export const maxDuration = 60; 
@@ -10,6 +10,8 @@ export async function POST(req: Request) {
     const reqBody = await req.json();
     const sceneId = reqBody.prompt || reqBody.sceneId;
     const profileId = reqBody.profileId;
+    const promptTemplateId = reqBody.promptTemplateId;
+    const instruction = reqBody.instruction;
 
     if (!sceneId) return new Response('Missing sceneId', { status: 400 });
 
@@ -21,16 +23,23 @@ export async function POST(req: Request) {
     if (!scene) return new Response('Scene not found', { status: 404 });
 
     // Leverage SSOT Prompt Factory via AI Actions
-    const finalPrompt = await generatePromptData(scene.chapter.bookId, sceneId, profileId, 'DRAFT');
+    const { system, prompt } = await generatePromptData(
+      scene.chapter.bookId, 
+      sceneId, 
+      profileId, 
+      promptTemplateId, 
+      'DRAFT',
+      undefined,
+      instruction
+    );
+
+    const settings = await getAppSettings();
+    const model = getAIModel(settings.activeProvider, settings.activeModelName);
 
     const result = await streamText({
-      model: google('gemini-2.5-flash'),
-      prompt: finalPrompt,
-      providerOptions: {
-        google: {
-          thinkingConfig: { thinkingBudget: 1024 },
-        },
-      },
+      model,
+      system,
+      prompt,
     });
 
     return result.toTextStreamResponse();

@@ -53,109 +53,98 @@ export default function GenreManagerPage() {
   );
 
   return (
-    <main className="flex-grow bg-slate-50 flex flex-col relative overflow-hidden text-slate-900">
-      {/* ATMOSPHERE BACKGROUND */}
-      <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.05]">
-         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-400 rounded-full blur-[150px]"></div>
-         <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-purple-400 rounded-full blur-[150px]"></div>
-      </div>
-
-      {/* TOOLBAR & SEARCH */}
-      <div className="px-8 py-4 border-b border-slate-200 bg-white/50 backdrop-blur-sm flex items-center justify-between shrink-0 z-10">
-        <div className="relative w-full max-w-md group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Filter by genre name..." 
-            className="input input-bordered input-sm w-full pl-10 bg-slate-100 border-slate-200 focus:bg-white focus:border-slate-900 transition-all rounded-md text-slate-900 font-medium"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+    <div className="p-12 w-full space-y-12">
+      
+      <header className="flex justify-between items-center">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight text-base-content uppercase">Genre Prompt Rules</h1>
+          <p className="text-sm font-medium text-base-content/60 uppercase tracking-widest">Global Drafting Directives</p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-1.5 bg-blue-50 text-blue-700 rounded border border-blue-100 shadow-sm mr-4">
-             <Wand2 size={12} />
-             <span className="text-[9px] font-black uppercase tracking-widest">Active Pipeline</span>
+        <div className="flex items-center gap-4">
+          <div className="relative w-64 group hidden md:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 opacity-40 group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Filter genres..." 
+              className="input input-bordered input-sm w-full pl-10 bg-base-100 border-base-300 focus:input-primary transition-all rounded-md text-[11px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
           <button 
-            className="btn btn-primary btn-sm rounded-md font-bold uppercase tracking-widest text-[10px] px-8 shadow-md"
+            className="btn btn-primary btn-sm rounded-md font-black uppercase tracking-widest text-[10px] px-8 shadow-md"
             onClick={() => { setEditingConfig(null); setIsModalOpen(true); }}
           >
-            <Plus size={14} className="mr-1" /> Add New Genre
+            <Plus size={14} className="mr-1" /> Add Genre
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* MAIN CONTENT - EDGE TO EDGE */}
-      <div className="p-6 flex-grow overflow-y-auto z-10 custom-scrollbar pb-32">
-        <div className="w-full flex flex-col gap-6">
-          
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-4 shadow-sm">
-             <AlertCircle className="text-amber-500 shrink-0" size={20} />
-             <div>
-                <h4 className="text-[11px] font-black uppercase tracking-widest text-amber-800">Pro Tip</h4>
-                <p className="text-xs text-amber-700 font-medium leading-relaxed mt-1">
-                   Ensure the **Genre Name** matches exactly the genre you type in your Book Bible. These rules are injected automatically into the AI Prompt Engine.
-                </p>
-             </div>
-          </div>
+      <div className="space-y-8">
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-5 flex items-start gap-4 shadow-sm">
+           <AlertCircle className="text-primary shrink-0" size={20} />
+           <div>
+              <h4 className="text-[11px] font-black uppercase tracking-widest text-primary">Intelligence Mapping</h4>
+              <p className="text-xs text-base-content/70 font-medium leading-relaxed mt-1">
+                 Ensure the **Genre Name** matches exactly the genre you type in your Book Bible. These rules are injected automatically into the AI Prompt Engine.
+              </p>
+           </div>
+        </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden w-full">
-            <table className="table table-sm w-full table-fixed text-slate-900">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
-                <tr className="text-[10px] uppercase tracking-widest">
-                  <th className="pl-8 font-black py-5 w-[20%]">Target Genre</th>
-                  <th className="font-black py-5 w-[65%]">Custom Drafting Rules</th>
-                  <th className="font-black py-5 text-right pr-8 w-[15%]">Actions</th>
+        <div className="bg-base-100 border border-base-200 rounded-xl shadow-sm overflow-hidden w-full">
+          <table className="table table-sm w-full table-fixed">
+            <thead className="bg-base-200/50 border-b border-base-300 text-base-content/50">
+              <tr className="text-[10px] uppercase tracking-widest font-black">
+                <th className="pl-8 py-5 w-[20%]">Target Genre</th>
+                <th className="py-5 w-[65%]">Custom Drafting Rules</th>
+                <th className="text-right pr-8 py-5 w-[15%]">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-base-200">
+              {filteredConfigs.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="text-center py-24 opacity-30 italic font-bold uppercase text-[10px] tracking-widest">
+                     No custom genre rules found
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredConfigs.length === 0 && (
-                  <tr>
-                    <td colSpan={3} className="text-center py-24 text-slate-300 italic font-medium">
-                       No custom genre rules found. Create one to enhance your AI prompts.
-                    </td>
-                  </tr>
-                )}
-                {filteredConfigs.map((config) => (
-                  <tr key={config.id} className="hover:bg-slate-50 group transition-colors">
-                    <td className="pl-8 py-6 align-top">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] shadow-md shrink-0">
-                           {config.genreName.slice(0, 2).toUpperCase()}
-                        </div>
-                        <span className="font-black text-xs uppercase tracking-tight text-slate-900 truncate">{config.genreName}</span>
+              )}
+              {filteredConfigs.map((config) => (
+                <tr key={config.id} className="hover:bg-primary/5 group transition-colors">
+                  <td className="pl-8 py-6 align-top">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-primary text-primary-content flex items-center justify-center font-black text-[10px] shadow-lg shadow-primary/20 shrink-0">
+                         {config.genreName.slice(0, 2).toUpperCase()}
                       </div>
-                    </td>
-                    <td className="py-6 align-top">
-                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-[10px] leading-relaxed text-slate-600 shadow-inner group-hover:bg-white transition-colors whitespace-pre-wrap break-words">
-                        {config.customPromptRules}
-                      </div>
-                    </td>
-                    <td className="text-right pr-8 py-6 align-top">
-                      <div className="flex justify-end gap-2">
-                        <button 
-                          className="btn btn-ghost btn-xs btn-square text-slate-400 hover:bg-slate-900 hover:text-white transition-all shadow-sm border border-slate-200"
-                          onClick={() => handleEdit(config)}
-                          title="Edit"
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button 
-                          className={`btn btn-ghost btn-xs btn-square text-slate-400 hover:bg-red-600 hover:text-white transition-all shadow-sm border border-slate-200`}
-                          onClick={() => handleDelete(config.id, config.genreName)}
-                          title="Delete"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      <span className="font-black text-xs uppercase tracking-tight text-base-content truncate">{config.genreName}</span>
+                    </div>
+                  </td>
+                  <td className="py-6 align-top">
+                    <div className="bg-base-200/50 border border-base-300 rounded-lg p-5 font-mono text-[10px] leading-relaxed text-base-content/70 shadow-inner group-hover:bg-base-100 transition-colors whitespace-pre-wrap break-words">
+                      {config.customPromptRules}
+                    </div>
+                  </td>
+                  <td className="text-right pr-8 py-6 align-top">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        className="btn btn-ghost btn-xs btn-square hover:bg-primary hover:text-primary-content transition-all shadow-sm border border-base-300"
+                        onClick={() => handleEdit(config)}
+                        title="Edit"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button 
+                        className="btn btn-ghost btn-xs btn-square text-error hover:bg-error hover:text-error-content transition-all shadow-sm border border-base-300"
+                        onClick={() => handleDelete(config.id, config.genreName)}
+                        title="Delete"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -164,10 +153,6 @@ export default function GenreManagerPage() {
         onClose={() => { setIsModalOpen(false); loadConfigs(); }} 
         editingConfig={editingConfig} 
       />
-
-      <footer className="p-4 bg-white border-t border-slate-200 text-center z-20">
-        <p className="text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">HOMO Rule Engine v2.3</p>
-      </footer>
-    </main>
+    </div>
   );
 }
