@@ -1,58 +1,49 @@
-# HOMO - Engineering Manifest
+# HOMO - Engineering Manifest v2.2.0
 
 ## 🎯 Project Overview
 "HOMO" is a specialized drafting tool for authors. It prioritizes structure, context, and a distraction-free writing experience. The app uses a hierarchical data model (Book -> Chapter -> Scene) to provide LLMs with precise context for generating high-quality drafting prompts.
 
 ## 🛠️ Tech Stack & Constraints
 - **Framework**: Next.js 16 (App Router) + React 19.
-- **AI Engine**: Google Gemini 2.5 Flash via Vercel AI SDK.
-- **Styling**: Tailwind CSS 4 + DaisyUI 5.
-- **Theme**: `corporate` (Light) and `dark`. High-contrast professional aesthetic.
+- **AI Engine**: Multi-provider support (Google Gemini, Anthropic Claude, OpenAI GPT) via Vercel AI SDK.
+- **Styling**: Tailwind CSS 4 + DaisyUI 5. Strictly semantic classes (`base-100`, `base-200`, `card`, `collapse`).
 - **Database**: SQLite with Prisma 6.
-- **Editor**: TipTap with `immediatelyRender: false`.
+- **Editor**: TipTap with internal scrolling and extreme density overrides.
 
 ## 🏗️ Architecture
 
-### 1. State Management (URL & Zustand)
-- **Navigation**: Managed via **Next.js Dynamic Routes** (`/book/[bookId]/chapter/[chapterId]/scene/[sceneId]`). The URL is the single source of truth.
-- **UI State**: Zustand (`src/store/useWorkspaceStore.ts`) manages transient UI context (panel visibility, focus mode, unsaved changes, modal data, and confirmation states).
-- **Streaming**: Custom hook `useAiStream.ts` handles vanilla JS fetch readers for bulletproof real-time generation immunity to HMR.
+### 1. State Management & Sync
+- **URL & Zustand**: Navigation is URL-driven. UI state (panel visibility, focus mode, active engine) is managed via Zustand (`src/store/useWorkspaceStore.ts`).
+- **AiEngineSync**: A global client component that initializes AI provider settings from the database on app load.
+- **Bidirectional Sync**: Editor footer controls (Model, Template, Persona) are synchronized with the Inspector and persisted to the DB via Server Actions.
 
-### 2. Component Hierarchy
-- `GlobalHeader`: Context-aware navbar. Hidden in **Focus Mode**. Includes "Prompt Preview" utility.
-- `WorkspaceClient`: Root workspace layout with collapsible sidebars and **Focus Mode** orchestration.
-- `ChapterManager`: Left Navigator with exclusive chapter expansion and active route highlighting.
-- `SceneEditor`: Central Canvas with TipTap, real-time word counting, and AI profile selector.
-- `Editor`: TipTap instance with a **Unified Bubble Menu** (formatting + AI rewrite triggers).
-- `AiProposalBox`: Isolated component for reviewing/accepting AI-generated text before insertion. Features an **Expanded View** and **Instruction Blueprint** terminal.
-- `ConfirmationModal`: Global styled replacement for native browser `confirm()` dialogs.
+### 2. Layout Hierarchy (Zero-Overlap Flexbox)
+- **Root Layout**: A strict `flex-col h-screen` structure where the Header, Main area, and global Footer occupy non-overlapping slots.
+- **Canvas Section**: A fixed-height container that hosts the Editor card. It prevents outer scroll to keep the Editor Footer anchored at the bottom.
+- **Editor Card**: A "floating" card with `shadow-2xl` and `mb-8+` spacing, visually detached from the system watermark footer.
 
-### 3. AI Intelligence (SSOT)
-- **Prompt Factory (`lib/prompt-builder.ts`)**: Single source of truth for all LLM instructions. Standardizes prompt hierarchy (Core Engine -> Manuscript Style -> Persona Overlay -> Context -> Task).
-- **AI Profile Management**: CRUD system for AI "Personas" (e.g., The Dark Epic Poet, The Action Director). Profiles are dynamically injected into the system prompt.
-- **Genre-Aware Prompting**: Automatically detects Fiction vs. Non-Fiction genres to adjust task directives and stylistic constraints.
-- **Context-Aware Rewriting**: Inline edits (Improve, Darker, etc.) are now fully aware of the book's synopsis and chapter goals.
-- **Hardened Prompts**: Strict XML delimiters prevent prompt injection from user data.
+### 3. Component Hierarchy
+- `GlobalHeader`: Context-aware navbar with quick-access project settings.
+- `ChapterManager`: Left Navigator with Drag & Drop reordering and exclusive expansion logic.
+- `SceneEditor`: Central workstation with internal scroll, real-time word counting, and the unified AI Footer.
+- `InspectorSection`: A reusable, stateful wrapper using DaisyUI `collapse` or `card` components based on a `collapsible` prop.
+- `FooterSelector`: A unified, premium dropdown component for Engine, Template, and Persona selection.
+
+### 4. AI Intelligence (SSOT)
+- **Prompt Factory (`lib/prompt-builder.ts`)**: Single source of truth. Standardizes prompt hierarchy (Core Engine -> Style -> Persona -> Context -> Task).
+- **Dynamic Grounding**: Injects `{{styleReference}}`, `{{authorialIntent}}`, and `{{loreConstraints}}` into the prompt context for deeper manuscript alignment.
+- **Contextual Action Chips**: Quick-access AI tasks (Improve, Cruder, Summarize) injected into the bubble menu for zero-click drafting.
 
 ## 💾 Data Safety & UX
-- **Safe Revalidation**: Server Actions use `revalidatePath`, triggered on the client via `startTransition` to avoid severing AI streams.
-- **Focus Mode**: Activated via UI button or **`Escape`**. Centers the editor and hides all distraction panels.
-- **Keyboard Shortcuts**:
-  - `Cmd/Ctrl + Enter`: Trigger AI Generation.
-  - `Escape`: Toggle Focus Mode.
-- **Exclusive Expansion**: Sidebar automatically manages chapter focus.
-- **Accordion Inspector**: All metadata sections are now collapsible `<details>` blocks to optimize vertical space.
+- **Data Portability**: Full JSON backup and Markdown manuscript exports available via browser or direct local disk save (`fs` API).
+- **Focus Mode**: Optimized for hardcore drafting with a `98vw` card width, reduced padding, and maximized text density.
+- **Safe Revalidation**: Server Actions use `revalidatePath` triggered via `startTransition` to protect active AI streams.
 
-## 📖 Key Knowledge & Gotchas
-- **Hydration Safety**: Use `FormattedNumber` or `FormattedDate` for locale-dependent strings.
-- **Webpack Watcher**: Database files are ignored in `next.config.ts`.
-- **Navigation**: Always use `Link` or `router.push`; avoid manual state setters for navigation.
-- **Zod Validation**: Centralized in `lib/validations.ts` with strict length limits (e.g., 5000 chars for Style guides).
-
-## 📜 Future Roadmap
-- [x] Real-time AI Streaming (Gemini 2.5 Flash).
-- [x] Inline Context-Aware AI Editing.
-- [x] Immersive Focus Mode.
-- [x] AI Profile Management (Personas).
+## 📜 Roadmap
+- [x] Multi-Engine Support (Claude, GPT, Gemini).
+- [x] Full Database Backup & Manuscript Export.
+- [x] Logical Inspector Refactor.
+- [x] Quick-Switch AI Footer.
 - [ ] Multi-format Export (PDF/ePub).
 - [ ] Version history/Snapshots.
+- [ ] Collaboration / Sync (Optional).
