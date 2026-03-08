@@ -49,10 +49,9 @@ export async function updateChapter(id: string, data: Partial<UpdateChapterInput
       where: { id: chapterId },
       data: payload,
     });
-    revalidatePath(`/book/${chapter.bookId}`);
-    revalidatePath('/');
+    // Removed revalidatePath to avoid infinite loops during auto-save.
     return { success: true, data: chapter };
-  } catch (error) {
+    } catch (err) {
     return { success: false, error: "Could not update chapter" };
   }
 }

@@ -17,6 +17,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+/logs/
+/logs_llm/
 
 # local env files
 .env
@@ -34,11 +36,20 @@ next-env.d.ts
 
 # prisma
 /prisma/migrations
+/prisma/backups/
 
 # sqlite
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 
 # os metadata
 .DS_Store
 Thumbs.db
+
+# project
+IMPROVEMENT_PLAN.md
+AGENTS.md
+.claude/
+.gemini/

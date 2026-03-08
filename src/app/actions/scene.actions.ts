@@ -2,9 +2,9 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { 
-  UpdateSceneContentSchema, 
-  UpdateScenePromptGoalsSchema, 
+import {
+  UpdateSceneContentSchema,
+  UpdateScenePromptGoalsSchema,
   IdSchema,
   CreateSceneSchema,
   UpdateSceneSchema,
@@ -16,20 +16,11 @@ import {
   UpdateScenePromptGoalsInput,
   UpdateSceneInput,
 } from '@/lib/validations';
+import { sanitizeHtml, calculateWordCount, validateHtml } from '@/lib/html-sanitizer';
 import { z } from 'zod';
 import { Scene } from '@prisma/client';
 import { ActionResponse } from '@/lib/types';
-
-// --- UTILITIES ---
-function calculateWordCount(html: string): number {
-  if (!html) return 0;
-  const text = html
-    .replace(/<[^>]*>?/gm, ' ') 
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')       
-    .trim();
-  return text ? text.split(/\s+/).length : 0;
-}
+import { log } from '@/lib/logger';
 
 // --- SCENE ACTIONS ---
 
@@ -61,14 +52,54 @@ export async function updateSceneContent(id: string, content: string): Promise<A
   if (!validated.success) return { success: false, error: "Invalid ID or Content" };
 
   try {
-    const wordCount = calculateWordCount(validated.data.content);
+    // SECURITY: Sanitize HTML content before storage
+    const sanitizedContent = sanitizeHtml(validated.data.content);
+
+    // Validate HTML structure
+    const validation = validateHtml(validated.data.content);
+    if (!validation.isValid) {
+      log.warn({
+        sceneId: validated.data.id,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        event: 'html_validation_warning'
+      }, 'HTML validation warnings detected');
+
+      // Log rejected content for debugging (only errors, not full content)
+      if (validation.errors.length > 0) {
+        log.error({
+          sceneId: validated.data.id,
+          errors: validation.errors,
+          event: 'malicious_content_sanitized'
+        }, 'Potentially malicious content detected and sanitized');
+      }
+    }
+
+    // Calculate word count from sanitized content
+    const wordCount = calculateWordCount(sanitizedContent);
+
     const scene = await prisma.scene.update({
       where: { id: validated.data.id },
-      data: { content: validated.data.content, wordCount },
+      data: { content: sanitizedContent, wordCount },
       include: { chapter: true }
     });
+
+    log.database({
+      operation: 'update',
+      model: 'scene',
+      recordId: validated.data.id
+    });
+
+    // We don't revalidate path here because we use synchronous TipTap updates
+    // and manual force-flushes to avoid editor resets.
     return { success: true, data: scene };
-  } catch (err) { return { success: false, error: "Failed to update content" }; }
+  } catch (err: any) {
+    log.error({
+      sceneId: validated.data.id,
+      event: 'update_scene_content_error'
+    }, 'Failed to update scene content', err);
+    return { success: false, error: "Failed to update content" };
+  }
 }
 
 export async function updateScenePromptGoals(id: string, promptGoals: string): Promise<ActionResponse<Scene>> {
@@ -81,6 +112,7 @@ export async function updateScenePromptGoals(id: string, promptGoals: string): P
       data: { promptGoals: validated.data.promptGoals },
       include: { chapter: true }
     });
+    revalidatePath(`/book/${scene.chapter.bookId}`);
     return { success: true, data: scene };
   } catch (err) { return { success: false, error: "Failed to update goals" }; }
 }
@@ -108,8 +140,20 @@ export async function updateScene(id: string, data: Partial<UpdateSceneInput>): 
     const { id: sceneId, ...payload } = validated.data;
     const updateData: any = { ...payload };
 
+    // SECURITY: Sanitize content if it's being updated
     if (payload.content !== undefined) {
-      updateData.wordCount = calculateWordCount(payload.content);
+      updateData.content = sanitizeHtml(payload.content);
+      updateData.wordCount = calculateWordCount(updateData.content);
+
+      // Validate and log warnings
+      const validation = validateHtml(payload.content);
+      if (!validation.isValid) {
+        console.warn('[Scene Update] HTML validation warnings:', {
+          sceneId,
+          errors: validation.errors,
+          warnings: validation.warnings
+        });
+      }
     }
 
     const scene = await prisma.scene.update({
@@ -117,7 +161,9 @@ export async function updateScene(id: string, data: Partial<UpdateSceneInput>): 
       data: updateData,
       include: { chapter: true }
     });
-    
+
+    // We don't revalidate here to avoid infinite loops during auto-save.
+    // The UI is kept in sync via Zustand and WorkspaceSync.
     return { success: true, data: scene };
   } catch (err: any) {
     return { success: false, error: "Failed to update scene" };
@@ -138,17 +184,21 @@ export async function toggleCharacterInScene(sceneId: string, characterId: strin
     if (!scene) return { success: false, error: "Scene not found" };
     const isPresent = scene.characters.some(c => c.id === characterId);
     
-    await prisma.scene.update({
+    const updatedScene = await prisma.scene.update({
       where: { id: sceneId },
-      data: { characters: isPresent ? { disconnect: { id: characterId } } : { connect: { id: characterId } } }
+      data: { characters: isPresent ? { disconnect: { id: characterId } } : { connect: { id: characterId } } },
+      include: { chapter: true }
     });
+    revalidatePath(`/book/${updatedScene.chapter.bookId}`);
     return { success: true, data: { isPresent: !isPresent } };
   } catch (err) { return { success: false, error: "Failed to toggle character" }; }
 }
 
 export async function reorderScenes(chapterId: string, updates: any): Promise<ActionResponse<null>> {
   try {
+    const chapter = await prisma.chapter.findUnique({ where: { id: chapterId } });
     await prisma.$transaction(updates.map((u: any) => prisma.scene.update({ where: { id: u.id }, data: { orderIndex: u.orderIndex, sceneNumber: u.orderIndex } })));
+    if (chapter) revalidatePath(`/book/${chapter.bookId}`);
     return { success: true, data: null };
   } catch (err) { return { success: false, error: "Failed to reorder" }; }
 }

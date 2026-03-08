@@ -18,6 +18,7 @@ import {
   PanelLeftClose,
   PanelRightOpen,
   PanelRightClose,
+  Zap
 } from 'lucide-react';
 import ScenePromptGeneratorWrapper from './ScenePromptGeneratorWrapper';
 
@@ -26,7 +27,8 @@ export default function GlobalHeader() {
   const { 
     activeBookTitle, saveStatus, 
     leftPanelOpen, toggleLeftPanel,
-    rightPanelOpen, toggleRightPanel
+    rightPanelOpen, toggleRightPanel,
+    isCacheActive
   } = useWorkspaceStore();
   
   const [theme, setTheme] = useState('fantasy');
@@ -76,9 +78,9 @@ export default function GlobalHeader() {
   return (
     <header className="navbar bg-base-100 border-b border-base-200 sticky top-0 z-50 px-6 min-h-16 shrink-0 shadow-sm font-sans">
       <div className="navbar-start gap-4 flex-grow-0">
-        <Link href="/" className="btn btn-ghost p-0 hover:bg-transparent flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary text-primary-content rounded-lg flex items-center justify-center font-black shadow-lg text-lg">H</div>
-        </Link>
+        </div>
 
         {isBookWorkspace && (
           <div className="flex gap-1 ml-2">
@@ -109,17 +111,33 @@ export default function GlobalHeader() {
 
       <div className="navbar-end gap-3 flex-grow">
         {isBookWorkspace && (
-          <div className="flex items-center gap-3 px-4 py-1.5 bg-base-200/50 rounded-full border border-base-300 animate-in fade-in duration-300 shrink-0">
-            {saveStatus.isSaving ? (
-              <div className="flex items-center gap-2 text-primary font-black text-[9px] uppercase tracking-widest">
-                <RefreshCw size={12} className="animate-spin" /> Syncing...
+          <div className="flex items-center gap-4">
+            {/* CACHE STATUS INDICATOR */}
+            <div 
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500 ${isCacheActive ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600' : 'bg-base-200/50 border-base-300 text-base-content/40'}`}
+              title={isCacheActive ? "AI Cache Active: Reduced Latency & Cost" : "AI Cache Cold: Preparing static context..."}
+            >
+              <div className="relative flex h-2 w-2">
+                {isCacheActive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isCacheActive ? 'bg-emerald-500' : 'bg-base-300'}`}></span>
               </div>
-            ) : (
-              <div className="flex items-center gap-2 text-success font-black text-[9px] uppercase tracking-widest">
-                <CheckCircle2 size={12} /> Synchronized
-              </div>
-            )}
-            {saveStatus.lastSynced && <span className="text-[9px] font-bold opacity-30 uppercase tracking-tighter border-l border-base-300 pl-3 ml-1 hidden sm:inline">{saveStatus.lastSynced}</span>}
+              <span className="text-[9px] font-black uppercase tracking-[0.1em]">
+                {isCacheActive ? 'Cache Hit' : 'Cold Start'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 px-4 py-1.5 bg-base-200/50 rounded-full border border-base-300 animate-in fade-in duration-300 shrink-0">
+              {saveStatus.isSaving ? (
+                <div className="flex items-center gap-2 text-primary font-black text-[9px] uppercase tracking-widest">
+                  <RefreshCw size={12} className="animate-spin" /> Syncing...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-success font-black text-[9px] uppercase tracking-widest">
+                  <CheckCircle2 size={12} /> Synchronized
+                </div>
+              )}
+              {saveStatus.lastSynced && <span className="text-[9px] font-bold opacity-30 uppercase tracking-tighter border-l border-base-300 pl-3 ml-1 hidden sm:inline">{saveStatus.lastSynced}</span>}
+            </div>
           </div>
         )}
 

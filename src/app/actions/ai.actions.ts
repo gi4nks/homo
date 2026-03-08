@@ -18,103 +18,131 @@ function cleanHtml(html: string): string {
     .trim();
 }
 
+// --- OPTIMIZED: Find previous scene without loading full book hierarchy ---
+// Only uses 1-2 targeted queries instead of fetching all chapters + all scenes
+async function findPreviousScene(currentScene: { id: string; chapterId: string; orderIndex: number; chapter: { bookId: string; orderIndex: number } }) {
+  // 1. Try to find previous scene in the same chapter (orderIndex - 1)
+  const prevInChapter = await prisma.scene.findFirst({
+    where: {
+      chapterId: currentScene.chapterId,
+      orderIndex: { lt: currentScene.orderIndex }
+    },
+    orderBy: { orderIndex: 'desc' },
+    select: { id: true, title: true, content: true, promptGoals: true }
+  });
+
+  if (prevInChapter) return prevInChapter;
+
+  // 2. If this is the first scene in the chapter, find the last scene of the previous chapter
+  const prevChapter = await prisma.chapter.findFirst({
+    where: {
+      bookId: currentScene.chapter.bookId,
+      orderIndex: { lt: currentScene.chapter.orderIndex }
+    },
+    orderBy: { orderIndex: 'desc' },
+    select: {
+      scenes: {
+        orderBy: { orderIndex: 'desc' },
+        take: 1,
+        select: { id: true, title: true, content: true, promptGoals: true }
+      }
+    }
+  });
+
+  return prevChapter?.scenes[0] || null;
+}
+
 // --- GENERATE PROMPT DATA ---
 export async function generatePromptData(
-  bookId: string, 
-  currentSceneId: string, 
-  profileId?: string, 
+  bookId: string,
+  currentSceneId?: string | null,
+  profileId?: string,
   promptTemplateId?: string,
-  taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE' = 'DRAFT', 
-  selectedText?: string, 
+  taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE' = 'DRAFT',
+  selectedText?: string,
   instruction?: string,
   originalVersion?: string,
   revisedVersion?: string,
-  liveContent?: string // CRITICAL: Added liveContent parameter
-): Promise<{ system: string; prompt: string }> {
+  liveContent?: string
+): Promise<{
+  system: string;
+  prompt: string;
+  staticContext: string;
+  dynamicContext: string;
+  tokenEstimate?: {
+    total: number;
+    static: number;
+    dynamic: number;
+    limit: number;
+    usagePercentage: number;
+    wasTruncated: boolean;
+    warning: string | null;
+  };
+}> {
   try {
-    const currentScene = await prisma.scene.findUnique({
-      where: { id: currentSceneId },
-      include: { 
-        chapter: true, 
-        characters: true 
-      }
-    });
-    if (!currentScene) throw new Error('Scene not found');
-
     const book = await prisma.book.findUnique({ 
       where: { id: bookId },
       include: { genreConfig: true }
     });
     if (!book) throw new Error('Book not found');
 
-    // ... [previous code for prevScene logic remains the same] ...
-    
-    // Get all scenes in order across all chapters
-    const bookWithOrderedContent = await prisma.book.findUnique({
-      where: { id: bookId },
-      include: { 
-        chapters: { 
-          orderBy: { orderIndex: 'asc' }, 
-          include: { 
-            scenes: { 
-              orderBy: { orderIndex: 'asc' } 
-            } 
-          } 
-        } 
-      }
-    });
-    
-    const allScenes: any[] = [];
-    bookWithOrderedContent?.chapters.forEach(ch => {
-      ch.scenes.forEach(s => {
-        allScenes.push({ id: s.id, title: s.title, chapter: ch.title, promptGoals: s.promptGoals });
+    let currentScene = null;
+    if (currentSceneId && !currentSceneId.startsWith("DUMMY_")) {
+      currentScene = await prisma.scene.findUnique({
+        where: { id: currentSceneId },
+        include: { chapter: true, characters: true }
       });
-    });
-    
-    const currentIndex = allScenes.findIndex(s => s.id === currentSceneId);
-    
-    const prevSceneSummary = currentIndex > 0 ? allScenes[currentIndex - 1] : null;
-    let prevScene = null;
-    if (prevSceneSummary) {
-      prevScene = await prisma.scene.findUnique({ where: { id: prevSceneSummary.id } });
     }
 
-    // CRITICAL: Use liveContent if provided, otherwise fallback to DB content
-    const contentToUse = liveContent !== undefined ? liveContent : currentScene.content;
-    const currentContentClean = cleanHtml(contentToUse);
-    const prevContentClean = prevScene ? cleanHtml(prevScene.content) : "";
+    // Default mock structures if scene is missing (book-level context)
+    const chapter = currentScene?.chapter || { bookId, chapterGoal: 'N/A' };
+    const scene = currentScene || { id: currentSceneId || 'global', title: 'Global Context', narrativePosition: 'MIDPOINT', promptGoals: 'N/A', characters: [] };
 
     let previousTextSnippet = "";
+    let previousSceneGoal = "N/A";
 
-    if (prevScene) {
-      previousTextSnippet += `### CONTEXT FROM PREVIOUS SCENE ("${prevScene.title}"):\n`;
-      previousTextSnippet += `[SCENE GOAL]: ${prevScene.promptGoals || 'N/A'}\n`;
-      previousTextSnippet += `[LAST 150 WORDS]:\n...${prevContentClean.slice(-1200)}\n\n`;
+    if (currentScene) {
+      // OPTIMIZED: Find previous scene without loading entire book hierarchy
+      // Strategy: Try same chapter first (orderIndex - 1), then last scene of previous chapter
+      const prevScene = await findPreviousScene(currentScene);
+
+      if (prevScene) {
+        const prevContentClean = cleanHtml(prevScene.content);
+        previousTextSnippet += `### CONTEXT FROM PREVIOUS SCENE ("${prevScene.title}"):\n`;
+        previousTextSnippet += `[SCENE GOAL]: ${prevScene.promptGoals || 'N/A'}\n`;
+        previousTextSnippet += `[LAST 150 WORDS]:\n...${prevContentClean.slice(-1200)}\n\n`;
+        previousSceneGoal = prevScene.promptGoals || 'N/A';
+      }
+
+      const contentToUse = liveContent !== undefined ? liveContent : currentScene.content;
+      const currentContentClean = cleanHtml(contentToUse);
+      if (currentContentClean.length > 10) {
+        previousTextSnippet += `### CURRENT SCENE PROGRESS ("${currentScene.title}"):\n${currentContentClean}\n`;
+      }
     }
 
-    if (currentContentClean.length > 10) {
-      previousTextSnippet += `### CURRENT SCENE PROGRESS ("${currentScene.title}"):\n`;
-      previousTextSnippet += `${currentContentClean}\n`;
-    } else if (!prevScene) {
-      previousTextSnippet = "START OF MANUSCRIPT: This is the very first scene of the book. No previous context available.";
-    } else {
-      previousTextSnippet += `### CURRENT SCENE STATUS:\n[The author has not written any prose for this scene yet. Continue from the previous scene context.]`;
+    if (!previousTextSnippet) {
+      previousTextSnippet = "Global Book Context. No specific scene progress available.";
     }
+
+    // VARIABLE: {{sceneText}} - Selection or full cleaned text
+    const sceneText = selectedText || (currentScene ? cleanHtml(liveContent || currentScene.content) : "");
 
     // CALL THE PROMPT FACTORY (SSOT)
     return await buildMasterPrompt({
       book,
-      chapter: currentScene.chapter,
-      scene: currentScene,
+      chapter,
+      scene,
       aiProfileId: profileId,
       promptTemplateId,
       taskType,
       selectedText,
       inlineInstruction: instruction,
       previousTextSnippet,
-      previousSceneGoal: prevScene?.promptGoals,
+      previousSceneGoal,
       originalVersion,
-      revisedVersion
+      revisedVersion,
+      sceneText
     });
 
   } catch (error) {
@@ -175,7 +203,6 @@ export async function seedAiProfiles() {
 
 // --- PREVIEW ACTION ---
 export async function getPromptPreview(sceneId: string, profileId?: string, promptTemplateId?: string): Promise<string> {
-  // Fetch the scene to get the bookId
   const scene = await prisma.scene.findUnique({
     where: { id: sceneId },
     select: { chapter: { select: { bookId: true } } }
@@ -242,27 +269,13 @@ export async function createPromptTemplate(data: any): Promise<ActionResponse<Pr
 
 export async function updatePromptTemplate(id: string, data: any): Promise<ActionResponse<PromptTemplate>> {
   try {
-    // Only pick relevant fields to avoid clobbering relations or internal fields
     const { name, description, phase, systemInstruction, contextTemplate, taskDirective, isDefault } = data;
-    
-    const updateData: any = {
-      name,
-      description,
-      phase,
-      systemInstruction,
-      contextTemplate,
-      taskDirective,
-      isDefault
-    };
-
-    if (isDefault) {
-      await prisma.promptTemplate.updateMany({ where: { NOT: { id } }, data: { isDefault: false } });
-    }
+    const updateData: any = { name, description, phase, systemInstruction, contextTemplate, taskDirective, isDefault };
+    if (isDefault) await prisma.promptTemplate.updateMany({ where: { NOT: { id } }, data: { isDefault: false } });
     const template = await prisma.promptTemplate.update({ where: { id }, data: updateData });
     revalidatePath('/settings/prompts');
     return { success: true, data: template };
   } catch (error) {
-    console.error("Update Template Error:", error);
     return { success: false, error: 'Failed to update template' };
   }
 }
@@ -271,23 +284,12 @@ export async function clonePromptTemplate(id: string): Promise<ActionResponse<Pr
   try {
     const source = await prisma.promptTemplate.findUnique({ where: { id } });
     if (!source) return { success: false, error: "Source template not found" };
-
     const clone = await prisma.promptTemplate.create({
-      data: {
-        name: `${source.name} (Copy)`,
-        description: source.description,
-        phase: source.phase,
-        systemInstruction: source.systemInstruction,
-        contextTemplate: source.contextTemplate,
-        taskDirective: source.taskDirective,
-        isDefault: false,
-      }
+      data: { name: `${source.name} (Copy)`, description: source.description, phase: source.phase, systemInstruction: source.systemInstruction, contextTemplate: source.contextTemplate, taskDirective: source.taskDirective, isDefault: false }
     });
-
     revalidatePath('/settings/prompts');
     return { success: true, data: clone };
   } catch (error) {
-    console.error('Clone failed:', error);
     return { success: false, error: "Failed to clone template" };
   }
 }
@@ -297,7 +299,6 @@ export async function deletePromptTemplate(id: string): Promise<ActionResponse<n
     const template = await prisma.promptTemplate.findUnique({ where: { id } });
     if (!template) return { success: false, error: "Template not found" };
     if (template.isDefault) return { success: false, error: "Cannot delete the system default template" };
-
     await prisma.promptTemplate.delete({ where: { id } });
     revalidatePath('/settings/prompts');
     return { success: true, data: null };
@@ -308,39 +309,39 @@ export async function deletePromptTemplate(id: string): Promise<ActionResponse<n
 
 // --- APP SETTINGS ACTIONS ---
 
-export async function getAppSettings(): Promise<AppSettings> {
+export async function getAppSettings(): Promise<AppSettings & { inspectorBindingsParsed?: any }> {
   try {
-    let settings = await prisma.appSettings.findUnique({
-      where: { id: 'global' }
-    });
-    if (!settings) {
-      settings = await prisma.appSettings.create({
-        data: { id: 'global' }
-      });
-    }
-    return settings;
+    let settings = await prisma.appSettings.findUnique({ where: { id: 'global' } });
+    if (!settings) settings = await prisma.appSettings.create({ data: { id: 'global' } });
+    return { ...settings, inspectorBindingsParsed: settings.inspectorBindings ? JSON.parse(settings.inspectorBindings) : {} };
   } catch (error) {
-    console.error('Failed to fetch app settings:', error);
     return {
       id: 'global',
       activeProvider: 'GOOGLE' as AIProvider,
       activeModelName: 'gemini-2.5-flash',
+      inspectorBindings: "{}",
+      inspectorBindingsParsed: {},
+      snapshotRetentionLimit: 50,
+      rateLimitGenerate: 20,
+      rateLimitRewrite: 30,
       updatedAt: new Date()
     };
   }
 }
 
-export async function updateAppSettings(data: Partial<{ activeProvider: AIProvider, activeModelName: string }>): Promise<ActionResponse<AppSettings>> {
+export async function updateAppSettings(data: Partial<{
+  activeProvider: AIProvider,
+  activeModelName: string,
+  inspectorBindings: string,
+  rateLimitGenerate: number,
+  rateLimitRewrite: number
+}>): Promise<ActionResponse<AppSettings>> {
   try {
-    const settings = await prisma.appSettings.upsert({
-      where: { id: 'global' },
-      update: data,
-      create: { id: 'global', ...data }
-    });
+    const settings = await prisma.appSettings.upsert({ where: { id: 'global' }, update: data, create: { id: 'global', ...data } });
     revalidatePath('/settings/ai-models');
+    revalidatePath('/settings/prompts');
     return { success: true, data: settings };
   } catch (error) {
-    console.error('Failed to update app settings:', error);
     return { success: false, error: 'Failed to update AI configuration' };
   }
 }

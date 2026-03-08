@@ -1,12 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useRef } from 'react';
+import React, { useState, useEffect, useTransition, useRef, useCallback } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useParams, useRouter } from 'next/navigation';
 import { updateScenePromptGoals, toggleCharacterInScene, updateScene } from '@/app/actions/scene.actions';
-import { Sparkles, Users, RefreshCw, Target, X, Library, Download, Cpu, Terminal as TerminalIcon, ShieldCheck, Database, PenTool, Lock, Unlock, AlertTriangle } from 'lucide-react';
+import { 
+  Sparkles, 
+  Users, 
+  RefreshCw, 
+  Target, 
+  X, 
+  Library, 
+  Download, 
+  Cpu, 
+  Terminal as TerminalIcon, 
+  ShieldCheck, 
+  Database, 
+  PenTool, 
+  Lock, 
+  Unlock, 
+  AlertTriangle,
+  Loader2,
+  Wand2,
+  Search
+} from 'lucide-react';
 import { compileManuscript, getPromptTemplates } from '@/app/actions/book.actions';
 import { getAiProfiles } from '@/app/actions/ai.actions';
+import { useAiStream } from '@/hooks/useAiStream';
 import InspectorSection from './InspectorSection';
 
 function useDebounce(value: string, delay: number) {
@@ -24,6 +44,7 @@ export default function SceneTab({ book }: { book: any }) {
   const activeSceneId = params.sceneId as string;
   const activeBookId = params.bookId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
+  const inspectorBindings = useWorkspaceStore(state => state.inspectorBindings);
   
   const chapters = useWorkspaceStore(state => state.chapters);
   const updateSceneLock = useWorkspaceStore(state => state.updateSceneLock);
@@ -32,11 +53,16 @@ export default function SceneTab({ book }: { book: any }) {
   const setActiveAiProfileId = useWorkspaceStore(state => state.setActiveAiProfileId);
   const activePromptTemplateId = useWorkspaceStore(state => state.activePromptTemplateId);
   const setActivePromptTemplateId = useWorkspaceStore(state => state.setActivePromptTemplateId);
+  const editorRef = useWorkspaceStore(state => state.editorRef);
 
   const [aiProfiles, setAiProfiles] = useState<any[]>([]);
   const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
   const [isPending, startTransition] = useTransition();
   const [isCompiling, setIsCompiling] = useState(false);
+
+  // Separate instance for Inspector AI generation
+  const { aiProposal, isAiLoading, startStream } = useAiStream();
+  const [activeAiField, setActiveAiField] = useState<string | null>(null);
 
   useEffect(() => {
     getAiProfiles().then(setAiProfiles);
@@ -47,43 +73,72 @@ export default function SceneTab({ book }: { book: any }) {
   const scene = chapters.flatMap((ch: any) => ch.scenes).find((s: any) => s.id === activeSceneId);
   const isLocked = scene?.isLocked || false;
 
+  const sceneDefaultAiProfileId = scene?.defaultAiProfileId;
+  const sceneDefaultPromptTemplateId = scene?.defaultPromptTemplateId;
+
   useEffect(() => {
     if (scene) {
-      const targetProfile = scene.defaultAiProfileId || book.defaultAiProfileId || null;
-      const targetTemplate = scene.defaultPromptTemplateId || book.defaultPromptTemplateId || null;
+      const targetProfile = sceneDefaultAiProfileId || book.defaultAiProfileId || null;
+      const targetTemplate = sceneDefaultPromptTemplateId || book.defaultPromptTemplateId || null;
       setActiveAiProfileId(targetProfile);
       setActivePromptTemplateId(targetTemplate);
     }
-  }, [scene?.id, book.defaultAiProfileId, book.defaultPromptTemplateId, setActiveAiProfileId, setActivePromptTemplateId]);
+  }, [
+    sceneDefaultAiProfileId,
+    sceneDefaultPromptTemplateId,
+    book.defaultAiProfileId,
+    book.defaultPromptTemplateId,
+    setActiveAiProfileId,
+    setActivePromptTemplateId
+  ]);
 
   const handleSceneAiProfileChange = async (id: string | null) => {
     if (!activeSceneId || isLocked) return;
     const val = id || null;
     setActiveAiProfileId(val);
-    await updateScene(activeSceneId, { defaultAiProfileId: val });
+    
+    setSaveStatus(true, null);
+    startTransition(async () => {
+      try {
+        const res = await updateScene(activeSceneId, { defaultAiProfileId: val });
+        if (res.success) {
+          setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        } else {
+          setSaveStatus(false, "Error");
+        }
+      } catch (err) {
+        setSaveStatus(false, "Error");
+      }
+    });
   };
 
   const handleScenePromptTemplateChange = async (id: string | null) => {
     if (!activeSceneId || isLocked) return;
     const val = id || null;
     setActivePromptTemplateId(val);
-    await updateScene(activeSceneId, { defaultPromptTemplateId: val });
+
+    setSaveStatus(true, null);
+    startTransition(async () => {
+      try {
+        const res = await updateScene(activeSceneId, { defaultPromptTemplateId: val });
+        if (res.success) {
+          setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        } else {
+          setSaveStatus(false, "Error");
+        }
+      } catch (err) {
+        setSaveStatus(false, "Error");
+      }
+    });
   };
 
   const handleToggleLock = async () => {
     if (!activeSceneId) return;
-    
     const nextState = !isLocked;
-    
-    // 1. Instant UI Update (Zustand)
     updateSceneLock(activeSceneId, nextState);
-    
     try {
-      // 2. Persist to DB
       const res = await updateScene(activeSceneId, { isLocked: nextState });
-      
       if (!res.success) {
-        // Revert if DB failed
         updateSceneLock(activeSceneId, !nextState);
         setSaveStatus(false, "Lock Error");
       }
@@ -93,46 +148,156 @@ export default function SceneTab({ book }: { book: any }) {
   };
 
   const [localGoals, setLocalSceneGoals] = useState(scene?.promptGoals || '');
-  const [localNarrativePosition, setLocalNarrativePosition] = useState(scene?.narrativePosition || 'Metà');
+  const [localAuditReport, setLocalAuditReport] = useState(scene?.auditReport || '');
+  const [localNarrativePosition, setLocalNarrativePosition] = useState(scene?.narrativePosition || 'MIDPOINT');
   const debouncedGoals = useDebounce(localGoals, 1500);
+  const debouncedAuditReport = useDebounce(localAuditReport, 1500);
   
   const isDirtyRef = useRef(false);
   const lastKnownSceneId = useRef(activeSceneId);
 
+  // Sync AI Stream results into local goals
   useEffect(() => {
-    if (scene?.promptGoals !== localGoals || scene?.narrativePosition !== localNarrativePosition) {
-      if (!isDirtyRef.current || lastKnownSceneId.current !== activeSceneId) {
-        setLocalSceneGoals(scene?.promptGoals || '');
-        setLocalNarrativePosition(scene?.narrativePosition || 'Metà');
-        isDirtyRef.current = false;
-        lastKnownSceneId.current = activeSceneId;
+    if (aiProposal && isAiLoading) {
+      if (activeAiField === 'promptGoals') {
+        setLocalSceneGoals(aiProposal);
+        isDirtyRef.current = true;
+      } else if (activeAiField === 'auditReport') {
+        setLocalAuditReport(aiProposal);
+        isDirtyRef.current = true;
       }
     }
-  }, [activeSceneId, scene?.promptGoals, scene?.narrativePosition]);
+    if (!isAiLoading) setActiveAiField(null);
+  }, [aiProposal, isAiLoading, activeAiField]);
 
-  const savePromptGoals = async (val: string) => {
-    if (!activeSceneId || isLocked || val === scene?.promptGoals) return;
+  // --- SYNC STORE -> LOCAL ---
+  useEffect(() => {
+    // 1. If scene ID changed, force reset local state
+    if (lastKnownSceneId.current !== activeSceneId) {
+      setLocalSceneGoals(scene?.promptGoals || '');
+      setLocalAuditReport(scene?.auditReport || '');
+      setLocalNarrativePosition(scene?.narrativePosition || 'MIDPOINT');
+      isDirtyRef.current = false;
+      lastKnownSceneId.current = activeSceneId;
+      return;
+    }
+
+    // 2. Sync updates from store ONLY if we are not in the middle of an operation
+    // and the store value actually changed from what we have locally.
+    if (!isAiLoading) {
+      if (!isDirtyRef.current && scene?.promptGoals !== undefined && scene.promptGoals !== localGoals) {
+        setLocalSceneGoals(scene.promptGoals);
+      }
+      if (!isDirtyRef.current && scene?.auditReport !== undefined && scene.auditReport !== localAuditReport) {
+        setLocalAuditReport(scene.auditReport);
+      }
+      if (scene?.narrativePosition !== undefined && scene.narrativePosition !== localNarrativePosition) {
+        setLocalNarrativePosition(scene.narrativePosition);
+      }
+    }
+  }, [activeSceneId, scene?.promptGoals, scene?.auditReport, scene?.narrativePosition, isAiLoading]);
+
+  // --- AUTO-SAVE LOGIC ---
+  const savePromptGoals = useCallback(async (val: string) => {
+    if (!activeSceneId || isLocked || val === scene?.promptGoals) {
+      isDirtyRef.current = false;
+      return;
+    }
+    
     setSaveStatus(true, null);
-    const res = await updateScenePromptGoals(activeSceneId, val);
-    setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
-    if (res.success) isDirtyRef.current = false;
-  };
+    try {
+      const res = await updateScenePromptGoals(activeSceneId, val);
+      if (res.success) {
+        setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        if (localGoals === val) isDirtyRef.current = false;
+      } else {
+        setSaveStatus(false, "Error");
+      }
+    } catch (err) {
+      setSaveStatus(false, "Error");
+    }
+  }, [activeSceneId, isLocked, scene?.promptGoals, localGoals, setSaveStatus]);
+
+  const saveAuditReport = useCallback(async (val: string) => {
+    if (!activeSceneId || isLocked || val === scene?.auditReport) {
+      isDirtyRef.current = false;
+      return;
+    }
+    
+    setSaveStatus(true, null);
+    try {
+      const res = await updateScene(activeSceneId, { auditReport: val });
+      if (res.success) {
+        setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        if (localAuditReport === val) isDirtyRef.current = false;
+      } else {
+        setSaveStatus(false, "Error");
+      }
+    } catch (err) {
+      setSaveStatus(false, "Error");
+    }
+  }, [activeSceneId, isLocked, scene?.auditReport, localAuditReport, setSaveStatus]);
 
   useEffect(() => {
-    if (isDirtyRef.current && debouncedGoals !== (scene?.promptGoals || '') && !isLocked) {
-      savePromptGoals(debouncedGoals);
+    if (isDirtyRef.current && !isLocked && !isAiLoading) {
+      if (debouncedGoals !== (scene?.promptGoals || '')) {
+        savePromptGoals(debouncedGoals);
+      }
+      if (debouncedAuditReport !== (scene?.auditReport || '')) {
+        saveAuditReport(debouncedAuditReport);
+      }
     }
-  }, [debouncedGoals, activeSceneId, isLocked, scene?.promptGoals]);
+  }, [debouncedGoals, debouncedAuditReport, activeSceneId, isLocked, isAiLoading, savePromptGoals, saveAuditReport, scene?.promptGoals, scene?.auditReport]);
 
   const handleNarrativePositionChange = async (val: string) => {
-    if (isLocked) return;
+    if (isLocked || !activeSceneId) return;
     setLocalNarrativePosition(val);
-    if (!activeSceneId) return;
     setSaveStatus(true, null);
-    const res = await updateScene(activeSceneId, { narrativePosition: val });
-    if (res.success) {
-      setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    try {
+      const res = await updateScene(activeSceneId, { narrativePosition: val });
+      if (res.success) {
+        setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      } else {
+        setSaveStatus(false, "Error");
+      }
+    } catch (err) {
+      setSaveStatus(false, "Error");
     }
+  };
+
+  const handleMagicAi = async (fieldId: string, currentVal: string) => {
+    const binding = inspectorBindings[fieldId];
+    if (!binding?.templateId || isAiLoading) return;
+
+    setActiveAiField(fieldId);
+
+    // Task 1: Flexible Context Extraction (TipTap live content)
+    // We get the current text from the editor via the shared editorRef
+    const liveText = editorRef?.getText?.() || "";
+
+    // Task 2: Field-Specific Input Handling
+    // If we're auditing, we switch taskType to ANALYZE so prompt-builder 
+    // focuses on the sceneText (the live content we just pulled).
+    let instruction = "Generate detailed content based on the provided rough idea.";
+    let taskType: 'DRAFT' | 'REWRITE' | 'ANALYZE' = 'DRAFT';
+
+    if (fieldId === 'auditReport') {
+      instruction = "Audit the following scene for continuity errors, plot holes, and structural weaknesses. Focus on the provided text.";
+      taskType = 'ANALYZE';
+    }
+
+    await startStream(
+      activeBookId,
+      activeSceneId,
+      binding.personaId || undefined,
+      binding.templateId,
+      instruction,
+      taskType,
+      undefined,
+      undefined,
+      liveText, // Passes editor content -> {{sceneText}} in prompt-builder
+      currentVal || "Analyze current context."
+    );
   };
 
   const handleCompileScene = async () => {
@@ -149,6 +314,27 @@ export default function SceneTab({ book }: { book: any }) {
         a.click();
       }
     } catch (err) { console.error(err); } finally { setIsCompiling(false); }
+  };
+
+  const renderMagicButton = (fieldId: string, currentVal: string) => {
+    const binding = inspectorBindings[fieldId];
+    if (!binding?.templateId) return null;
+    const isThisLoading = isAiLoading && activeAiField === fieldId;
+
+    return (
+      <button 
+        onClick={() => handleMagicAi(fieldId, currentVal)}
+        disabled={isAiLoading}
+        className={`btn btn-xs btn-outline btn-primary gap-1.5 font-black uppercase tracking-widest text-[8px] transition-all flex-shrink-0 shadow-sm ${
+          isThisLoading 
+            ? 'loading' 
+            : 'hover:scale-105'
+        }`}
+      >
+        {!isThisLoading && <Wand2 size={10} />}
+        {isThisLoading ? 'Forging...' : '✨ AI'}
+      </button>
+    );
   };
 
   if (!activeSceneId) return null;
@@ -172,7 +358,6 @@ export default function SceneTab({ book }: { book: any }) {
               </div>
             </div>
             
-            {/* POWER TOGGLE - NO MODAL, INSTANT ACTION */}
             <input 
               type="checkbox" 
               className={`toggle toggle-lg ${isLocked ? 'toggle-error' : 'toggle-primary'}`} 
@@ -213,10 +398,12 @@ export default function SceneTab({ book }: { book: any }) {
             onChange={(e) => handleNarrativePositionChange(e.target.value)}
             disabled={isLocked}
           >
-            <option value="Inizio">Inizio (Beginning)</option>
-            <option value="Metà">Metà (Middle/Rising Action)</option>
-            <option value="Climax">Climax</option>
-            <option value="Epilogo">Epilogo (Resolution)</option>
+            <option value="OPENING">Inizio</option>
+            <option value="RISING_ACTION">Sviluppo (Rising Action)</option>
+            <option value="MIDPOINT">Metà (Midpoint)</option>
+            <option value="CLIMAX">Climax</option>
+            <option value="FALLING_ACTION">Discesa (Falling Action)</option>
+            <option value="RESOLUTION">Risoluzione</option>
           </select>
         </div>
 
@@ -270,13 +457,17 @@ export default function SceneTab({ book }: { book: any }) {
       {/* SECTION 3: THE ACTION */}
       <InspectorSection title="The Action" icon={PenTool} defaultOpen={true}>
         <div className="form-control w-full">
-          <label className="label py-1">
-            <span className="label-text font-black text-[9px] uppercase opacity-40 flex items-center gap-2">
-              <Sparkles size={10} /> Cosa succede in questa scena? (Beats)
-            </span>
-          </label>
+          <div className="flex items-center justify-between w-full mb-1 gap-2">
+            <label className="label py-0 flex-1 min-w-0">
+              <span className="label-text font-black text-[9px] uppercase opacity-40 flex items-center gap-2 truncate">
+                <Sparkles size={10} className="flex-shrink-0" /> Cosa succede in questa scena? (Beats)
+              </span>
+            </label>
+            {!isLocked && renderMagicButton('promptGoals', localGoals)}
+          </div>
+
           <textarea 
-            className="textarea textarea-bordered w-full min-h-[250px] font-bold text-xs leading-relaxed"
+            className={`textarea textarea-bordered w-full min-h-[250px] font-bold text-xs leading-relaxed shadow-inner focus:bg-base-50 transition-colors ${isAiLoading && activeAiField === 'promptGoals' ? 'opacity-50 cursor-wait' : ''}`}
             placeholder="Scrivi in modo sintetico le azioni in ordine cronologico..." 
             value={localGoals} 
             onChange={(e) => {
@@ -285,14 +476,42 @@ export default function SceneTab({ book }: { book: any }) {
               setLocalSceneGoals(e.target.value);
             }} 
             onBlur={() => savePromptGoals(localGoals)}
-            disabled={isLocked}
+            disabled={isLocked || (isAiLoading && activeAiField === 'promptGoals')}
           />
+          
           {!isLocked && (
             <div className="flex justify-end gap-2 mt-2 opacity-20">
-               <RefreshCw size={10} className={isPending ? 'animate-spin' : ''} />
+               <RefreshCw size={10} className={(isPending || isAiLoading) ? 'animate-spin' : ''} />
                <span className="text-[8px] font-black uppercase tracking-tighter text-base-content/60">Auto-syncing Context</span>
             </div>
           )}
+        </div>
+      </InspectorSection>
+
+      {/* SECTION: CONTINUITY AUDITOR */}
+      <InspectorSection title="Continuity Auditor" icon={Search} defaultOpen={false}>
+        <div className="form-control w-full">
+          <div className="flex items-center justify-between w-full mb-1 gap-2">
+            <label className="label py-0 flex-1 min-w-0">
+              <span className="label-text font-black text-[9px] uppercase opacity-40 flex items-center gap-2 truncate">
+                <Search size={10} className="flex-shrink-0" /> AUDIT & CONTINUITY REPORT
+              </span>
+            </label>
+            {!isLocked && renderMagicButton('auditReport', localAuditReport)}
+          </div>
+
+          <textarea 
+            className={`textarea textarea-bordered w-full min-h-[200px] font-mono text-[10px] leading-relaxed shadow-inner focus:bg-base-50 transition-colors ${isAiLoading && activeAiField === 'auditReport' ? 'opacity-50 cursor-wait' : ''}`}
+            placeholder="No audit report generated yet. Use the Magic AI button to audit this scene's continuity." 
+            value={localAuditReport} 
+            onChange={(e) => {
+              if (isLocked) return;
+              isDirtyRef.current = true;
+              setLocalAuditReport(e.target.value);
+            }} 
+            onBlur={() => saveAuditReport(localAuditReport)}
+            disabled={isLocked || (isAiLoading && activeAiField === 'auditReport')}
+          />
         </div>
       </InspectorSection>
 

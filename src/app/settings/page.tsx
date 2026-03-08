@@ -2,15 +2,16 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { 
-  BookOpen, 
+import {
+  BookOpen,
   Settings as SettingsIcon,
   ChevronRight,
   Database,
   Cpu,
   ShieldCheck,
   Zap,
-  FileCode
+  FileCode,
+  Terminal
 } from 'lucide-react';
 
 export default function SettingsHubPage() {
@@ -96,6 +97,24 @@ export default function SettingsHubPage() {
           </div>
         </Link>
 
+        {/* ACTIVE: Inspector Bindings */}
+        <Link href="/settings/inspector" className="card bg-base-100 rounded-xl shadow-sm border border-base-200 transition-all hover:shadow-md hover:border-primary group h-full flex flex-col">
+          <div className="card-body p-8 gap-6 flex flex-col flex-1">
+            <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-content transition-all duration-300">
+              <Zap size={24} />
+            </div>
+            <div className="flex-grow">
+              <h3 className="font-bold text-lg text-base-content group-hover:text-primary transition-colors uppercase tracking-tight">Inspector Bindings</h3>
+              <p className="text-sm text-base-content/70 leading-relaxed mt-2">
+                Map specific Inspector fields to specialized AI protocols. Automate your outlining and structural drafting.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary pt-4 border-t border-base-200 mt-auto">
+              Configure Bindings <ChevronRight size={14} />
+            </div>
+          </div>
+        </Link>
+
         {/* ACTIVE: Data & Exports */}
         <Link href="/settings/exports" className="card bg-base-100 rounded-xl shadow-sm border border-base-200 transition-all hover:shadow-md hover:border-primary group h-full flex flex-col">
           <div className="card-body p-8 gap-6 flex flex-col flex-1">
@@ -110,6 +129,24 @@ export default function SettingsHubPage() {
             </div>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary pt-4 border-t border-base-200 mt-auto">
               Manage Data <ChevronRight size={14} />
+            </div>
+          </div>
+        </Link>
+
+        {/* ACTIVE: System Logs */}
+        <Link href="/settings/logs" className="card bg-base-100 rounded-xl shadow-sm border border-base-200 transition-all hover:shadow-md hover:border-primary group h-full flex flex-col">
+          <div className="card-body p-8 gap-6 flex flex-col flex-1">
+            <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-content transition-all duration-300">
+              <Terminal size={24} />
+            </div>
+            <div className="flex-grow">
+              <h3 className="font-bold text-lg text-base-content group-hover:text-primary transition-colors uppercase tracking-tight">System Logs</h3>
+              <p className="text-sm text-base-content/70 leading-relaxed mt-2">
+                Monitor application events, AI generation logs, errors, and performance metrics. Debug with precision.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary pt-4 border-t border-base-200 mt-auto">
+              View Logs <ChevronRight size={14} />
             </div>
           </div>
         </Link>

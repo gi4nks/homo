@@ -1,4 +1,4 @@
-# HOMO - Engineering Manifest v2.6.0
+# HOMO - Engineering Manifest v3.0.0
 
 ## 🎯 Project Overview
 "HOMO" is a specialized drafting tool for authors. It prioritizes structure, context, and a distraction-free writing experience. The app uses a hierarchical data model (Book -> Chapter -> Scene) to provide LLMs with precise context for generating high-quality drafting prompts.
@@ -18,25 +18,27 @@
 - **Precision Replacement**: Revision tasks use `insertContentAt` with persistent selection coordinates to perfectly overwrite original text even after UI deselects.
 - **Hardened Auto-Save**: Metadata fields in the Inspector (Synopsis, Goals, Lore) now feature debounced auto-save + `onBlur` force-sync, integrated with the global sync indicator.
 
-### 2. Scene Security & Lifecycle
-- **Scene Locking**: A hardcoded protection mechanism (`isLocked`) that disables editing and AI generation for finalized prose.
-- **Optimistic Locking**: Toggle actions are processed instantly via Zustand and persisted to the DB without destructive page revalidations.
-- **Read-Only Mode**: Locked scenes maintain full typographical contrast for reading pleasure but disable the AI Bubble Menu and formatting tools.
+### 2. AI Intelligence (SSOT & CMS V2)
+- **Prompt Factory (`lib/prompt-builder.ts`)**: Single source of truth. Standardizes prompt hierarchy (Core Engine -> Style -> Persona -> Context -> Task).
+- **Prompt Caching**: Implemented for Anthropic (Ephemeral) and Google Gemini (Context Caching >32k tokens) to reduce cost and latency.
+- **Visual Validation**: The `HighlightedPromptEditor` provides real-time regex-based syntax highlighting for dynamic variables ({{sceneText}}, {{authorialIntent}}, etc.) in the CMS.
+- **Dynamic Inspector Bindings**: Configuration UI in Settings allows mapping specific Inspector fields to specialized AI Protocols and Personas, rendering "Magic AI Buttons" (✨) on-demand.
 
 ### 3. Layout Hierarchy (Zero-Overlap Flexbox)
 - **Root Layout**: A strict `flex-col h-screen` structure where the Header, Main area, and global Footer occupy non-overlapping slots.
 - **Canvas Section**: A fixed-height container that hosts the Editor card. It prevents outer scroll to keep the Editor Footer anchored at the bottom.
+- **Floating Action Badges**: Magic AI buttons are positioned as non-overlapping floating badges within the field labels row, preventing UI occlusion.
+
+### 4. Scene Security & Lifecycle
+- **Scene Locking**: A hardcoded protection mechanism (`isLocked`) that disables editing and AI generation for finalized prose.
 - **Faded Ink Sidebar**: Completed chapters and scenes utilize a muted `slate-400` italic aesthetic to visually recede, highlighting active work.
 
-### 4. AI Intelligence (SSOT)
-- **Prompt Factory (`lib/prompt-builder.ts`)**: Single source of truth. Standardizes prompt hierarchy (Core Engine -> Style -> Persona -> Context -> Task).
-- **Live Content Injection**: AI API calls (`/api/generate`) now receive `liveContent` from the client ref, bypassing stale database states.
-- **Global Cast Management**: Centralized character list in the Book tab acting as the master source for scene-level character selection.
-
-## 💾 Data Safety & UX
-- **Snapshot System**: Automated versioning ("Auto: Pre-AI") captured before every AI generation to prevent data loss.
-- **Force Flush Logic**: Every AI trigger forces an immediate synchronous save to the database before the LLM is invoked.
-- **Focus Mode**: Optimized for hardcore drafting with a `98vw` card width and maximized text density.
+## 💾 Data Safety & Security
+- **Hardened Security**: Multi-layer security audit confirmed zero hardcoded secrets. All AI providers (Google, Anthropic, OpenAI) use server-side environment variables via Vercel AI SDK.
+- **Git Integrity**: Enhanced `.gitignore` rules protect SQLite temporary files (`-shm`, `-wal`), local tool configurations (`.claude/`, `.gemini/`), and automated backups.
+- **Snapshot System**: Automated versioning ("Auto: Pre-AI") captured before every AI generation.
+- **Backup Redundancy**: Automated backup system with integrity checks (MD5) before `dev` and `build` cycles.
+- **Cache Hit Indicator**: Global "Cache Hit / Cold Start" indicator provides real-time performance feedback.
 
 ## 📜 Roadmap
 - [x] Multi-Engine Support (Claude, GPT, Gemini).
@@ -45,5 +47,8 @@
 - [x] Scene Locking & Protection logic.
 - [x] Unified AI Drafting/Revision flow.
 - [x] Global Cast Management (Book Tab).
+- [x] Dynamic AI Inspector Bindings.
+- [x] Prompt Caching (Anthropic/Gemini).
+- [x] Security Hardening & Secret Management Audit.
 - [ ] Multi-format Export (PDF/ePub).
 - [ ] Collaboration / Sync (Optional).

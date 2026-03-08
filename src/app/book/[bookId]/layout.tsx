@@ -1,5 +1,6 @@
 import React from 'react';
 import { getBookById } from '@/app/actions/book.actions';
+import { getAppSettings } from '@/app/actions/ai.actions';
 import { notFound } from 'next/navigation';
 import WorkspaceSync from './WorkspaceSync';
 import WorkspaceShell from './WorkspaceShell';
@@ -9,7 +10,7 @@ import CanvasSection from './CanvasSection';
 import ChapterManager from '@/components/ChapterManager';
 import Inspector from '@/components/Inspector';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function BookLayout({
   children,
@@ -23,6 +24,7 @@ export default async function BookLayout({
   if (!bookId) notFound();
   
   const response = await getBookById(bookId);
+  const settings = await getAppSettings();
 
   if (!response.success || !response.data) notFound();
 
@@ -37,7 +39,12 @@ export default async function BookLayout({
 
   return (
     <div className="flex flex-col h-full bg-base-50 overflow-hidden text-base-content selection:bg-primary/20">
-      <WorkspaceSync title={book.title} chapters={formattedBook.chapters} />
+      <WorkspaceSync 
+        title={book.title} 
+        chapters={formattedBook.chapters} 
+        inspectorBindings={settings.inspectorBindingsParsed}
+        isCacheHit={book.lastAiCacheHit || false}
+      />
       
       <div className="flex-grow flex overflow-hidden">
         <WorkspaceShell>

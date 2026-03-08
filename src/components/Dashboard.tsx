@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition, useMemo, useEffect } from 'react';
+import React, { useState, useTransition, useEffect } from 'react';
 import { createBook, deleteBook, duplicateBook } from '@/app/actions/book.actions';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import Link from 'next/link';
@@ -23,15 +23,22 @@ import {
   Copy
 } from 'lucide-react';
 
-interface Book { 
-  id: string; 
-  title: string; 
-  genre: string; 
-  status: string; 
-  updatedAt: string; 
-  chaptersCount?: number; 
-  scenesCount?: number; 
-  totalWords?: number; 
+interface Book {
+  id: string;
+  title: string;
+  genre: string;
+  status: string;
+  updatedAt: string;
+  chaptersCount?: number;
+  scenesCount?: number;
+  totalWords?: number;
+}
+
+interface PaginationInfo {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 const FormattedDate = ({ dateString }: { dateString: string }) => {
@@ -40,29 +47,44 @@ const FormattedDate = ({ dateString }: { dateString: string }) => {
   return <>{formatted}</>;
 };
 
-export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
+export default function Dashboard({ initialBooks, pagination, initialSearch = '' }: { initialBooks: Book[]; pagination: PaginationInfo; initialSearch?: string }) {
   const router = useRouter();
   const openConfirmModal = useWorkspaceStore(state => state.openConfirmModal);
   const [isPending, startTransition] = useTransition();
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const getBookStats = (book: Book) => {
-    return { 
-      totalWords: book.totalWords || 0, 
+    return {
+      totalWords: book.totalWords || 0,
       readingTime: Math.ceil((book.totalWords || 0) / 200),
-      totalChapters: book.chaptersCount || 0, 
-      totalScenes: book.scenesCount || 0 
+      totalChapters: book.chaptersCount || 0,
+      totalScenes: book.scenesCount || 0
     };
   };
 
-  const filteredBooks = useMemo(() => {
-    return initialBooks.filter(book => 
-      book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      book.genre.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [initialBooks, searchQuery]);
+  // Debounced server-side search via URL
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      const params = new URLSearchParams();
+      if (value.trim()) params.set('search', value.trim());
+      params.set('page', '1'); // Reset to first page on search
+      router.push(`/?${params.toString()}`);
+    }, 400);
+  };
+
+  const goToPage = (page: number) => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    if (page > 1) params.set('page', String(page));
+    router.push(`/?${params.toString()}`);
+  };
+
+  const filteredBooks = initialBooks; // Search is now server-side
 
   const handleCreateBook = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -73,11 +95,11 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
     if (!title) return;
     startTransition(async () => {
       const res = await createBook({ title, genre, tone, status: 'Planning' });
-      if (res.success) {
+      if (res.success && res.data) {
         setShowModal(false);
         router.push(`/book/${res.data.id}`);
       } else {
-        alert(res.error);
+        alert(res.error || "Failed to create book");
       }
     });
   };
@@ -123,7 +145,7 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
             <div className="flex items-center gap-2">
                <Library size={16} className="text-secondary" />
                <h2 className="text-xs font-black uppercase tracking-[0.2em] opacity-70">My Library</h2>
-               <div className="badge badge-secondary badge-outline badge-sm font-mono text-[10px]">{filteredBooks.length}</div>
+               <div className="badge badge-secondary badge-outline badge-sm font-mono text-[10px]">{pagination.total}</div>
             </div>
             <div className="divider divider-horizontal mx-0 h-4 opacity-30"></div>
             <div className="flex bg-base-300 p-1 rounded-lg">
@@ -139,8 +161,8 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
               type="text" 
               placeholder="Filter manuscripts..." 
               className="input input-bordered input-sm w-full pl-10 bg-base-100 border-base-300 focus:input-primary transition-all rounded-md" 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)} 
             />
          </div>
 
@@ -242,6 +264,59 @@ export default function Dashboard({ initialBooks }: { initialBooks: Book[] }) {
           )
         )}
       </div>
+
+      {/* PAGINATION */}
+      {pagination.totalPages > 1 && (
+        <div className="px-8 py-3 border-t border-base-300 bg-base-100/50 backdrop-blur-sm flex items-center justify-between shrink-0 z-10">
+          <span className="text-[10px] font-bold uppercase opacity-40 tracking-widest">
+            {((pagination.page - 1) * pagination.pageSize) + 1}-{Math.min(pagination.page * pagination.pageSize, pagination.total)} of {pagination.total} manuscripts
+          </span>
+          <div className="join">
+            <button
+              className="join-item btn btn-xs"
+              disabled={pagination.page <= 1}
+              onClick={() => goToPage(pagination.page - 1)}
+            >
+              Prev
+            </button>
+            {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+              .filter(p => Math.abs(p - pagination.page) <= 2 || p === 1 || p === pagination.totalPages)
+              .map((p, idx, arr) => {
+                // Show ellipsis for gaps
+                if (idx > 0 && p - arr[idx - 1] > 1) {
+                  return (
+                    <React.Fragment key={`gap-${p}`}>
+                      <button className="join-item btn btn-xs btn-disabled" key={`ellipsis-${p}`}>...</button>
+                      <button
+                        className={`join-item btn btn-xs ${p === pagination.page ? 'btn-active' : ''}`}
+                        onClick={() => goToPage(p)}
+                        key={p}
+                      >
+                        {p}
+                      </button>
+                    </React.Fragment>
+                  );
+                }
+                return (
+                  <button
+                    className={`join-item btn btn-xs ${p === pagination.page ? 'btn-active' : ''}`}
+                    onClick={() => goToPage(p)}
+                    key={p}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            <button
+              className="join-item btn btn-xs"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => goToPage(pagination.page + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal modal-open z-[100]">

@@ -9,6 +9,11 @@ export interface Scene {
   sceneNumber: number;
   wordCount: number;
   isLocked?: boolean;
+  promptGoals?: string;
+  auditReport?: string;
+  narrativePosition?: string;
+  defaultAiProfileId?: string | null;
+  defaultPromptTemplateId?: string | null;
 }
 
 export interface Chapter {
@@ -16,6 +21,7 @@ export interface Chapter {
   title: string;
   orderIndex: number;
   chapterNumber: number;
+  auditReport?: string;
   scenes: Scene[];
 }
 
@@ -44,6 +50,7 @@ interface WorkspaceState {
   // AI Engine Info
   activeProvider: string | null;
   activeModelName: string | null;
+  isCacheActive: boolean;
   
   // Sidebar State (Single Source of Truth)
   chapters: Chapter[];
@@ -51,6 +58,9 @@ interface WorkspaceState {
   // Scene Default (Persistent in DB)
   activeAiProfileId: string | null;
   activePromptTemplateId: string | null;
+
+  // AI Inspector Bindings
+  inspectorBindings: Record<string, { templateId: string | null, personaId: string | null }>;
 
   // Local Override (Ephemeral for immediate action)
   overrideAiProfileId: string | null;
@@ -70,8 +80,20 @@ interface WorkspaceState {
   modal: ModalState;
   confirmModal: ConfirmModalState;
 
+  // AI Edit Undo System
+  lastAiEdit: {
+    range: { from: number; to: number };
+    oldContent: string;
+    newContent: string;
+    timestamp: number;
+  } | null;
+
+  // Global Editor Reference for Inspector AI Actions
+  editorRef: any | null;
+
   // Actions
   setActiveBookTitle: (title: string) => void;
+  setCacheActive: (status: boolean) => void;
   setActiveTab: (tab: WorkspaceTab) => void;
   setAiEngine: (provider: string, model: string) => void;
   
@@ -83,6 +105,9 @@ interface WorkspaceState {
   // Actions for Scene Defaults
   setActiveAiProfileId: (id: string | null) => void;
   setActivePromptTemplateId: (id: string | null) => void;
+  setInspectorBindings: (bindings: Record<string, { templateId: string | null, personaId: string | null }>) => void;
+
+  setEditorRef: (ref: any | null) => void;
 
   // Actions for Local Overrides
   setOverrideAiProfileId: (id: string | null) => void;
@@ -93,6 +118,10 @@ interface WorkspaceState {
   toggleFocusMode: () => void;
   setUnsavedChanges: (status: boolean) => void;
   setSaveStatus: (isSaving: boolean, lastSynced?: string | null) => void;
+
+  // AI Edit Undo Actions
+  setLastAiEdit: (edit: { range: { from: number; to: number }; oldContent: string; newContent: string }) => void;
+  clearLastAiEdit: () => void;
 
   // Modal Actions
   openMetadataModal: (mode: string, bookId: string, targetId: string | null, title?: string, num?: number) => void;
@@ -112,11 +141,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   
   activeProvider: null,
   activeModelName: null,
+  isCacheActive: false,
 
   chapters: [],
 
   activeAiProfileId: null,
   activePromptTemplateId: null,
+  inspectorBindings: {},
   overrideAiProfileId: null,
   overridePromptTemplateId: null,
 
@@ -125,6 +156,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   isFocusMode: false,
   hasUnsavedChanges: false,
   saveStatus: { isSaving: false, lastSynced: null },
+
+  lastAiEdit: null,
+  editorRef: null,
 
   modal: {
     isOpen: false,
@@ -144,6 +178,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   },
 
   setActiveBookTitle: (title) => set({ activeBookTitle: title }),
+  setCacheActive: (status) => set({ isCacheActive: status }),
   setActiveTab: (tab) => set({ activeTab: tab }),
   setAiEngine: (provider, model) => set({ activeProvider: provider, activeModelName: model }),
   
@@ -174,6 +209,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     activePromptTemplateId: id,
     overridePromptTemplateId: id // Sync override to new default
   }),
+  setInspectorBindings: (bindings) => set({ inspectorBindings: bindings }),
+
+  setEditorRef: (ref) => set({ editorRef: ref }),
 
   setOverrideAiProfileId: (id) => set({ overrideAiProfileId: id }),
   setOverridePromptTemplateId: (id) => set({ overridePromptTemplateId: id }),
@@ -191,11 +229,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setUnsavedChanges: (status) => set({ hasUnsavedChanges: status }),
 
   setSaveStatus: (isSaving, lastSynced = null) => set((state) => ({
-    saveStatus: { 
-      isSaving, 
-      lastSynced: lastSynced || state.saveStatus.lastSynced 
+    saveStatus: {
+      isSaving,
+      lastSynced: lastSynced || state.saveStatus.lastSynced
     }
   })),
+
+  setLastAiEdit: (edit) => set({
+    lastAiEdit: {
+      ...edit,
+      timestamp: Date.now()
+    }
+  }),
+
+  clearLastAiEdit: () => set({ lastAiEdit: null }),
 
   openMetadataModal: (mode, bookId, targetId, title = '', num = 1) => set({
     modal: { isOpen: true, mode, bookId, targetId, title, num }
@@ -221,11 +268,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
     activeBookTitle: null,
     activeAiProfileId: null,
     activePromptTemplateId: null,
+    inspectorBindings: {},
     overrideAiProfileId: null,
     overridePromptTemplateId: null,
     hasUnsavedChanges: false,
     chapters: [],
     activeProvider: null,
     activeModelName: null,
+    isCacheActive: false,
+    editorRef: null,
   })
 }));

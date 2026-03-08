@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useTransition, useRef } from 'react';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
 import { useParams } from 'next/navigation';
 import { updateChapter } from '@/app/actions/chapter.actions';
@@ -12,9 +12,16 @@ import {
   Download, 
   Database,
   ChartBarStacked,
-  ChevronRight
+  ChevronRight,
+  Loader2,
+  Wand2,
+  Globe,
+  Search,
+  Activity
 } from 'lucide-react';
+import { useAiStream } from '@/hooks/useAiStream';
 import InspectorSection from './InspectorSection';
+import ReactMarkdown from 'react-markdown';
 
 function useDebounce(value: string, delay: number) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -30,36 +37,126 @@ export default function ChapterTab({ book }: { book: any }) {
   const activeChapterId = params.chapterId as string;
   const activeBookId = params.bookId as string;
   const setSaveStatus = useWorkspaceStore((state) => state.setSaveStatus);
+  const inspectorBindings = useWorkspaceStore(state => state.inspectorBindings);
 
   const chapter = book.chapters.find((c: any) => c.id === activeChapterId);
 
   const [localTitle, setLocalTitle] = useState(chapter?.title || '');
   const [localGoal, setLocalGoal] = useState(chapter?.chapterGoal || '');
+  const [localAuditReport, setLocalAuditReport] = useState(chapter?.auditReport || '');
   const [isCompiling, setIsCompiling] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const { aiProposal, isAiLoading, startStream } = useAiStream();
+  const [activeAiField, setActiveAiField] = useState<string | null>(null);
+  const editorRef = useWorkspaceStore(state => state.editorRef);
 
   useEffect(() => {
-    setLocalTitle(chapter?.title || '');
-    setLocalGoal(chapter?.chapterGoal || '');
-  }, [chapter]);
+    if (chapter?.title !== undefined && chapter.title !== localTitle) setLocalTitle(chapter.title || '');
+  }, [chapter?.title]);
+
+  useEffect(() => {
+    if (chapter?.chapterGoal !== undefined && chapter.chapterGoal !== localGoal) setLocalGoal(chapter.chapterGoal || '');
+  }, [chapter?.chapterGoal]);
+
+  useEffect(() => {
+    if (chapter?.auditReport !== undefined && chapter.auditReport !== localAuditReport) setLocalAuditReport(chapter.auditReport || '');
+  }, [chapter?.auditReport]);
 
   const debouncedTitle = useDebounce(localTitle, 1500);
   const debouncedGoal = useDebounce(localGoal, 1500);
+  const debouncedAuditReport = useDebounce(localAuditReport, 1500);
 
-  const saveField = async (data: any) => {
+  const isDirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (aiProposal && isAiLoading && activeAiField) {
+      if (activeAiField === 'chapterGoal') {
+        setLocalGoal(aiProposal);
+        isDirtyRef.current = true;
+      } else if (activeAiField === 'chapterAudit') {
+        setLocalAuditReport(aiProposal);
+        isDirtyRef.current = true;
+      }
+    }
+    if (!isAiLoading) setActiveAiField(null);
+  }, [aiProposal, isAiLoading, activeAiField]);
+
+  const chapterRef = useRef(chapter);
+  useEffect(() => { chapterRef.current = chapter; }, [chapter]);
+
+  const saveField = useCallback(async (data: any) => {
     if (!activeChapterId) return;
-    
-    // Check if data actually changed
     const keys = Object.keys(data);
-    const hasChanged = keys.some(key => data[key] !== chapter[key]);
+    const hasChanged = keys.some(key => data[key] !== chapterRef.current?.[key]);
     if (!hasChanged) return;
 
     setSaveStatus(true, null);
     const res = await updateChapter(activeChapterId, data);
-    setSaveStatus(false, res.success ? new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Error");
+    if (res.success) {
+      setSaveStatus(false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      isDirtyRef.current = false;
+    } else {
+      setSaveStatus(false, "Error");
+    }
+  }, [activeChapterId, setSaveStatus]);
+
+  useEffect(() => { if (debouncedTitle !== (chapter?.title || '')) saveField({ title: debouncedTitle }); }, [debouncedTitle, chapter?.title, saveField]);
+  useEffect(() => { if (isDirtyRef.current && debouncedGoal !== (chapter?.chapterGoal || '') && !isAiLoading) saveField({ chapterGoal: debouncedGoal }); }, [debouncedGoal, chapter?.chapterGoal, isAiLoading, saveField]);
+  useEffect(() => { if (isDirtyRef.current && debouncedAuditReport !== (chapter?.auditReport || '') && !isAiLoading) saveField({ auditReport: debouncedAuditReport }); }, [debouncedAuditReport, chapter?.auditReport, isAiLoading, saveField]);
+
+  // --- CHAPTER AUDIT LOGIC ---
+  const handleRunChapterAudit = async () => {
+    if (isAiLoading || !chapter) return;
+    
+    const scenesToAudit = chapter.scenes || [];
+    if (scenesToAudit.length === 0) return;
+
+    const activeSceneId = params.sceneId as string;
+    let concatenatedText = `CHAPTER AUDIT: ${chapter.title} (Chapter ${chapter.chapterNumber})\n\n`;
+
+    scenesToAudit.forEach((s: any) => {
+      const text = (s.id === activeSceneId && editorRef) 
+        ? editorRef.getText() 
+        : s.content.replace(/<[^>]*>?/gm, ' ').replace(/&nbsp;/g, ' ');
+        
+      concatenatedText += `\n--- [SCENE: ${s.title}] ---\n\n${text}\n`;
+    });
+
+    setActiveAiField('chapterAudit');
+
+    await startStream(
+      activeBookId,
+      null,
+      undefined, 
+      undefined, 
+      "Perform a Continuity and Structural Audit for this specific chapter. Identify inconsistencies between its scenes, pacing issues, and plot gaps. Provide a structured feedback report.",
+      'ANALYZE',
+      undefined,
+      undefined,
+      concatenatedText,
+      "Analyze the chapter's internal continuity."
+    );
   };
 
-  useEffect(() => { if (debouncedTitle !== (chapter?.title || '')) saveField({ title: debouncedTitle }); }, [debouncedTitle]);
-  useEffect(() => { if (debouncedGoal !== (chapter?.chapterGoal || '')) saveField({ chapterGoal: debouncedGoal }); }, [debouncedGoal]);
+  const handleMagicAi = async (fieldId: string, currentVal: string) => {
+    const binding = inspectorBindings[fieldId];
+    if (!binding?.templateId || isAiLoading) return;
+
+    setActiveAiField(fieldId);
+    await startStream(
+      activeBookId,
+      params.sceneId as string || null,
+      binding.personaId || undefined,
+      binding.templateId,
+      "Refine or expand this chapter objective based on the story context.",
+      'DRAFT',
+      undefined,
+      undefined,
+      undefined,
+      currentVal || "Suggest an objective for this chapter."
+    );
+  };
 
   const handleCompileChapter = async () => {
     if (!activeBookId || !activeChapterId) return;
@@ -79,6 +176,27 @@ export default function ChapterTab({ book }: { book: any }) {
 
   const getChapterWordCount = () => {
     return chapter?.scenes.reduce((acc: number, scene: any) => acc + (scene.wordCount || 0), 0) || 0;
+  };
+
+  const renderMagicButton = (fieldId: string, currentVal: string) => {
+    const binding = inspectorBindings[fieldId];
+    if (!binding?.templateId) return null;
+    const isThisLoading = isAiLoading && activeAiField === fieldId;
+
+    return (
+      <button 
+        onClick={() => handleMagicAi(fieldId, currentVal)}
+        disabled={isAiLoading}
+        className={`btn btn-xs btn-outline btn-primary gap-1.5 font-black uppercase tracking-widest text-[8px] transition-all flex-shrink-0 shadow-sm ${
+          isThisLoading 
+            ? 'loading' 
+            : 'hover:scale-105'
+        }`}
+      >
+        {!isThisLoading && <Wand2 size={10} />}
+        {isThisLoading ? 'Forging...' : '✨ AI'}
+      </button>
+    );
   };
 
   if (!activeChapterId) return null;
@@ -104,18 +222,66 @@ export default function ChapterTab({ book }: { book: any }) {
         </div>
 
         <div className="form-control w-full">
-          <label className="label py-1">
-            <span className="label-text font-black text-[9px] uppercase opacity-40 flex items-center gap-2">
-              <Target size={10} /> Chapter Objective
-            </span>
-          </label>
+          <div className="flex items-center justify-between w-full mb-1 gap-2">
+            <label className="label py-0 flex-1 min-w-0">
+              <span className="label-text font-black text-[9px] uppercase opacity-40 flex items-center gap-2 truncate">
+                <Target size={10} className="flex-shrink-0" /> Chapter Objective
+              </span>
+            </label>
+            {renderMagicButton('chapterGoal', localGoal)}
+          </div>
           <textarea 
-            className={textareaClass}
+            className={`${textareaClass} ${isAiLoading && activeAiField === 'chapterGoal' ? 'opacity-50 cursor-wait' : ''}`}
             value={localGoal} 
-            onChange={(e) => setLocalGoal(e.target.value)} 
+            onChange={(e) => {
+              isDirtyRef.current = true;
+              setLocalGoal(e.target.value);
+            }} 
             onBlur={() => saveField({ chapterGoal: localGoal })}
             placeholder="What is the main goal or arc of this chapter?"
+            disabled={isAiLoading && activeAiField === 'chapterGoal'}
           />
+        </div>
+      </InspectorSection>
+
+      {/* SECTION: CHAPTER CONTINUITY AUDITOR */}
+      <InspectorSection title="Chapter Continuity Audit" icon={Globe} defaultOpen={false}>
+        <div className="space-y-4">
+          <button 
+            onClick={handleRunChapterAudit}
+            disabled={isAiLoading}
+            className={`btn btn-primary btn-sm rounded-xl font-black uppercase tracking-widest text-[10px] w-full shadow-lg shadow-primary/20 ${isAiLoading && activeAiField === 'chapterAudit' ? 'loading' : ''}`}
+          >
+            {isAiLoading && activeAiField === 'chapterAudit' ? 'Auditing Chapter...' : '✨ Run Chapter Audit'}
+          </button>
+
+          {isAiLoading && activeAiField === 'chapterAudit' && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-tight animate-pulse">
+              <Activity size={12} />
+              Analyzing chapter scenes...
+            </div>
+          )}
+
+          <div className="form-control w-full">
+            <label className="label py-1"><span className="label-text font-black text-[9px] uppercase opacity-40">Chapter Audit Report</span></label>
+            <textarea 
+              className={textareaClass + " min-h-[250px] font-mono text-[10px]"}
+              value={localAuditReport} 
+              onChange={(e) => {
+                isDirtyRef.current = true;
+                setLocalAuditReport(e.target.value);
+              }} 
+              onBlur={() => saveField({ auditReport: localAuditReport })}
+              placeholder="Chapter audit results will appear here..."
+              disabled={isAiLoading && activeAiField === 'chapterAudit'}
+            />
+          </div>
+
+          {localAuditReport && (
+            <div className="p-4 bg-base-200/50 rounded-xl border border-base-300 prose prose-xs dark:prose-invert max-w-none overflow-y-auto max-h-[300px] custom-scrollbar">
+              <ReactMarkdown>{localAuditReport}</ReactMarkdown>
+            </div>
+          )}
         </div>
       </InspectorSection>
 

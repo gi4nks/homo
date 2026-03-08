@@ -32,7 +32,15 @@ const AI_MODELS = [
   ]},
   { provider: 'Anthropic Claude', models: [
     { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
-    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' }
+    { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
+    { id: 'claude-opus-4-5-20251101', name: 'Claude Opus 4.5' },
+    { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5' },
+    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5 (Spec)' },
+    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
+    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1' },
+    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4' },
+    { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude Haiku 3' }
   ]},
   { provider: 'OpenAI GPT', models: [
     { id: 'gpt-4o', name: 'GPT-4o' },
@@ -56,7 +64,7 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const overrideAiProfileId = useWorkspaceStore(state => state.overrideAiProfileId);
   const overridePromptTemplateId = useWorkspaceStore(state => state.overridePromptTemplateId);
   const updateSceneWordCount = useWorkspaceStore(state => state.updateSceneWordCount);
-  const { activeProvider, activeModelName, setAiEngine } = useWorkspaceStore();
+  const { activeProvider, activeModelName, setAiEngine, setEditorRef } = useWorkspaceStore();
 
   const chapters = useWorkspaceStore(state => state.chapters);
   const storeScene = chapters.flatMap(c => c.scenes).find(s => s.id === sceneId);
@@ -67,6 +75,13 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
   const [promptTemplates, setPromptTemplates] = useState<any[]>([]);
   
   const editorRef = useRef<EditorRef>(null);
+
+  useEffect(() => {
+    if (editorRef.current) {
+      setEditorRef(editorRef.current);
+    }
+    return () => setEditorRef(null);
+  }, [sceneId, setEditorRef]);
   const lastSavedContentRef = useRef<string>('');
   
   // TRACKS IF AI IS REPLACING SELECTION OR APPENDING
@@ -209,8 +224,43 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
     </div>
   );
 
+  const handleUnlockScene = async () => {
+    if (!sceneId) return;
+
+    // Open confirmation modal
+    useWorkspaceStore.getState().openConfirmModal({
+      title: 'Unlock Scene',
+      message: 'Are you sure you want to unlock this scene? You will be able to edit and modify the content again.',
+      confirmLabel: 'Unlock',
+      onConfirm: async () => {
+        await updateScene(sceneId, { isLocked: false });
+        useWorkspaceStore.getState().updateSceneLock(sceneId, false);
+        useWorkspaceStore.getState().closeConfirmModal();
+      }
+    });
+  };
+
   return (
     <div className="flex flex-col h-full bg-base-100 rounded-2xl shadow-2xl border border-base-300 overflow-hidden relative">
+      {/* LOCK BADGE (Floating, visible when locked) */}
+      {isLocked && (
+        <div className="absolute top-4 right-4 z-50 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div
+            className="flex items-center gap-2 px-4 py-2 bg-error text-error-content rounded-full shadow-2xl border border-error/30 font-bold text-sm uppercase tracking-widest"
+            title="This scene is locked. Click to unlock and enable editing."
+          >
+            <Lock size={16} />
+            Scene Locked
+            <button
+              onClick={handleUnlockScene}
+              className="ml-2 px-3 py-1 bg-error-content text-error rounded-full hover:scale-105 transition-transform text-xs font-black"
+            >
+              Unlock
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 overflow-hidden relative bg-base-100 flex flex-col">
         <div className="flex-1 overflow-hidden relative flex flex-col">
           <Editor 
@@ -235,14 +285,27 @@ export default function SceneEditor({ bookId, sceneId }: SceneEditorProps) {
           promptBlueprint={promptBlueprint}
           onAccept={async () => {
             if (isLocked) return;
-            
+
+            // Capture old content for undo system
+            const oldContent = editorRef.current?.getHTML() || '';
+
             if (aiActionContextRef.current.mode === 'REPLACE' && aiActionContextRef.current.range) {
-              editorRef.current?.replaceRange(aiProposal, aiActionContextRef.current.range);
+              const range = aiActionContextRef.current.range;
+
+              // Save for undo (capture range and content)
+              useWorkspaceStore.getState().setLastAiEdit({
+                range,
+                oldContent,
+                newContent: aiProposal
+              });
+
+              editorRef.current?.replaceRange(aiProposal, range);
             } else {
               const formattedAppend = `<p></p><p>${aiProposal.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br />')}</p>`;
               editorRef.current?.insertContent(formattedAppend);
+              // Note: Append mode doesn't set lastAiEdit (harder to undo partial appends)
             }
-            
+
             await editorRef.current?.forceSave();
             clearProposal();
           }}

@@ -111,15 +111,20 @@ export default function GenreManagerPage() {
               {filteredConfigs.map((config) => (
                 <tr key={config.id} className="hover:bg-primary/5 group transition-colors">
                   <td className="pl-8 py-6 align-top">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary text-primary-content flex items-center justify-center font-black text-[10px] shadow-lg shadow-primary/20 shrink-0">
-                         {config.genreName.slice(0, 2).toUpperCase()}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-primary text-primary-content flex items-center justify-center font-black text-[10px] shadow-lg shadow-primary/20 shrink-0">
+                           {config.genreName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="font-black text-xs uppercase tracking-tight text-base-content truncate">{config.genreName}</span>
                       </div>
-                      <span className="font-black text-xs uppercase tracking-tight text-base-content truncate">{config.genreName}</span>
+                      <div className="badge badge-primary badge-outline badge-xs font-black text-[8px] uppercase tracking-widest px-2 py-2 ml-1">
+                        Target Genre
+                      </div>
                     </div>
                   </td>
                   <td className="py-6 align-top">
-                    <div className="bg-base-200/50 border border-base-300 rounded-lg p-5 font-mono text-[10px] leading-relaxed text-base-content/70 shadow-inner group-hover:bg-base-100 transition-colors whitespace-pre-wrap break-words">
+                    <div className="bg-base-200/50 border border-base-300 rounded-lg p-5 font-mono text-[11px] leading-relaxed text-base-content/80 shadow-inner group-hover:bg-base-100 transition-colors whitespace-pre-wrap break-words min-h-[100px]">
                       {config.customPromptRules}
                     </div>
                   </td>

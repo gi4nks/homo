@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import { getAppSettings, updateAppSettings } from '@/app/actions/ai.actions';
 import { AIProvider } from '@prisma/client';
-import { 
-  Save, Server, Cpu, CheckCircle2, ArrowLeft, Terminal, 
+import {
+  Save, Server, Cpu, CheckCircle2, ArrowLeft, Terminal,
   ShieldCheck, Info, Zap, Brain, Sparkles, Network, Activity,
-  Globe, Lock, Layers, Code
+  Globe, Lock, Layers, Code, Timer
 } from 'lucide-react';
 import Link from 'next/link';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
@@ -65,20 +65,29 @@ const PROVIDERS = [
 export default function AiModelsSettings() {
   const [activeProvider, setActiveProvider] = useState<AIProvider>('GOOGLE');
   const [activeModelName, setActiveModelName] = useState('gemini-2.5-flash');
+  const [rateLimitGenerate, setRateLimitGenerate] = useState(20);
+  const [rateLimitRewrite, setRateLimitRewrite] = useState(30);
   const [isPending, startTransition] = useTransition();
   const [saveSuccess, setSaveStatus] = useState(false);
   const setAiEngine = useWorkspaceStore(state => state.setAiEngine);
 
   useEffect(() => {
     getAppSettings().then(settings => {
-      setActiveProvider(settings.activeProvider);
+      setActiveProvider(settings.activeProvider as AIProvider);
       setActiveModelName(settings.activeModelName);
+      setRateLimitGenerate(settings.rateLimitGenerate || 20);
+      setRateLimitRewrite(settings.rateLimitRewrite || 30);
     });
   }, []);
 
   const handleSave = () => {
     startTransition(async () => {
-      const res = await updateAppSettings({ activeProvider, activeModelName });
+      const res = await updateAppSettings({
+        activeProvider,
+        activeModelName,
+        rateLimitGenerate,
+        rateLimitRewrite
+      });
       if (res.success) {
         setSaveStatus(true);
         setAiEngine(activeProvider, activeModelName);
@@ -219,6 +228,65 @@ export default function AiModelsSettings() {
                     />
                   </div>
                 )}
+              </div>
+            </section>
+
+            {/* RATE LIMITING SECTION */}
+            <section className="space-y-6">
+              <h3 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2 text-warning">
+                <Timer size={14} /> DoS PROTECTION (RATE LIMITS)
+              </h3>
+
+              <div className="bg-base-200/20 border border-base-300 rounded-xl p-8 shadow-inner space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* AI Generation Rate Limit */}
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black uppercase tracking-widest opacity-60">AI Generation (Draft/Continue)</label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        className="input input-bordered input-sm w-24 font-mono text-sm font-bold bg-base-100 rounded-md border-base-300 focus:border-warning"
+                        value={rateLimitGenerate}
+                        onChange={(e) => setRateLimitGenerate(Number(e.target.value))}
+                      />
+                      <span className="text-[10px] font-bold opacity-40 uppercase">requests / minute</span>
+                    </div>
+                    <p className="text-[9px] font-medium opacity-40 uppercase tracking-tighter leading-relaxed">
+                      Applied to <code className="text-warning">/api/generate</code> endpoint
+                    </p>
+                  </div>
+
+                  {/* AI Rewrite Rate Limit */}
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-black uppercase tracking-widest opacity-60">AI Rewrite (Inline Edits)</label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        className="input input-bordered input-sm w-24 font-mono text-sm font-bold bg-base-100 rounded-md border-base-300 focus:border-warning"
+                        value={rateLimitRewrite}
+                        onChange={(e) => setRateLimitRewrite(Number(e.target.value))}
+                      />
+                      <span className="text-[10px] font-bold opacity-40 uppercase">requests / minute</span>
+                    </div>
+                    <p className="text-[9px] font-medium opacity-40 uppercase tracking-tighter leading-relaxed">
+                      Applied to <code className="text-warning">/api/rewrite</code> endpoint
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-warning/5 border border-warning/10 flex gap-3">
+                  <ShieldCheck size={16} className="text-warning shrink-0" />
+                  <div className="space-y-1">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-warning/80">Security Notice</h4>
+                    <p className="text-[9px] font-medium leading-relaxed opacity-60 uppercase tracking-tighter">
+                      Rate limits prevent API abuse and protect against accidental infinite loops. Limits are enforced per IP address.
+                    </p>
+                  </div>
+                </div>
               </div>
             </section>
 

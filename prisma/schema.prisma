@@ -20,6 +20,9 @@ model Book {
   styleReference     String          @default("")
   authorialIntent    String          @default("")
   loreConstraints    String          @default("")
+  globalAuditReport  String          @default("")
+  existingLoreConstraints String?    @default("")
+  lastAiCacheHit     Boolean?        @default(false)
   status             String          @default("Planning")
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
@@ -60,6 +63,7 @@ model Chapter {
   orderIndex    Int
   chapterNumber Int      @default(1)
   chapterGoal   String   @default("")
+  auditReport   String   @default("")
   scenes        Scene[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -74,11 +78,12 @@ model Scene {
   title       String
   content     String      @default("")
   promptGoals String      @default("")
-  narrativePosition String @default("Metà")
+  narrativePosition String @default("MIDPOINT")
   orderIndex  Int
   sceneNumber Int         @default(1)
   wordCount   Int         @default(0)
   isLocked    Boolean     @default(false)
+  auditReport String      @default("")
   characters  Character[] @relation("SceneCast")
   snapshots   Snapshot[]
 
@@ -139,11 +144,16 @@ enum PipelinePhase {
 }
 
 model AppSettings {
-  id               String     @id @default("global")
-  activeProvider   AIProvider @default(GOOGLE)
-  activeModelName  String     @default("gemini-2.5-flash")
-  updatedAt        DateTime   @updatedAt
+  id                      String     @id @default("global")
+  activeProvider          String     @default("GOOGLE")
+  activeModelName         String     @default("gemini-2.5-flash")
+  inspectorBindings       String?    @default("{}") // JSON string for field-to-prompt mappings
+  snapshotRetentionLimit  Int        @default(50)   // Max snapshots per scene (0 = unlimited)
+  rateLimitGenerate       Int        @default(20)   // AI generation requests per minute
+  rateLimitRewrite        Int        @default(30)   // AI rewrite requests per minute
+  updatedAt               DateTime   @updatedAt
 }
+
 
 enum AIProvider {
   GOOGLE

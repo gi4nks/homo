@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Terminal, ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react';
+import { Sparkles, Terminal, ChevronDown, ChevronUp, Maximize2, Minimize2, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface AiProposalBoxProps {
@@ -23,8 +23,19 @@ export default function AiProposalBox({
 }: AiProposalBoxProps) {
   const [showBlueprint, setShowBlueprint] = React.useState(false);
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
   
   if (!proposal && !isLoading) return null;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(proposal);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   return (
     <div className={`m-4 mx-8 p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/20 shadow-2xl transition-all duration-500 ease-in-out relative overflow-hidden flex flex-col ${
@@ -49,7 +60,7 @@ export default function AiProposalBox({
             <button 
               type="button"
               onClick={() => setShowBlueprint(!showBlueprint)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-black uppercase tracking-tighter transition-all ${showBlueprint ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-indigo-500/5 text-indigo-500/60 border-indigo-500/20 hover:bg-indigo-500/10'}`}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded border text-[9px] font-black uppercase tracking-tighter transition-all ${showBlueprint ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-indigo-50 text-indigo-500/60 border-indigo-500/20 hover:bg-indigo-500/10'}`}
             >
               <Terminal size={10} />
               Blueprint
@@ -59,6 +70,19 @@ export default function AiProposalBox({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* COPY BUTTON */}
+          {!isLoading && proposal && (
+            <button 
+              type="button"
+              onClick={handleCopy}
+              className={`btn btn-ghost btn-xs gap-1.5 font-black uppercase tracking-widest text-[9px] transition-all ${copied ? 'text-success' : 'text-indigo-500/60 hover:text-indigo-600 hover:bg-indigo-500/5'}`}
+              title="Copy to clipboard"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          )}
+
           {/* EXPAND TOGGLE */}
           <button 
             type="button"

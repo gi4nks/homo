@@ -54,10 +54,35 @@ export async function updateBookTarget(bookId: string, target: number): Promise<
   }
 }
 
-export async function getBooks(): Promise<ActionResponse<any[]>> {
+export async function getBooks(options?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}): Promise<ActionResponse<any[]> & { pagination?: { total: number; page: number; pageSize: number; totalPages: number } }> {
   try {
+    const page = options?.page ?? 1;
+    const pageSize = options?.pageSize ?? 20;
+    const search = options?.search?.trim();
+
+    // Build where clause for search
+    const where = search
+      ? {
+          OR: [
+            { title: { contains: search } },
+            { genre: { contains: search } }
+          ]
+        }
+      : {};
+
+    // Get total count for pagination
+    const total = await prisma.book.count({ where });
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
     const books = await prisma.book.findMany({
+      where,
       orderBy: { updatedAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         title: true,
@@ -86,7 +111,7 @@ export async function getBooks(): Promise<ActionResponse<any[]>> {
     const formattedBooks = books.map(book => {
       let sceneCount = 0;
       let totalWords = 0;
-      
+
       book.chapters.forEach(ch => {
         sceneCount += ch.scenes.length;
         ch.scenes.forEach(s => {
@@ -102,7 +127,11 @@ export async function getBooks(): Promise<ActionResponse<any[]>> {
       };
     });
 
-    return { success: true, data: formattedBooks };
+    return {
+      success: true,
+      data: formattedBooks,
+      pagination: { total, page, pageSize, totalPages }
+    };
   } catch (error) {
     console.error("Get Books Error:", error);
     return { success: false, error: "Failed to fetch books" };
@@ -198,8 +227,7 @@ export async function updateBookBible(id: string, data: Partial<UpdateBookBibleI
       data: payload,
     });
 
-    revalidatePath(`/book/${bookId}`, 'layout');
-    revalidatePath('/');
+    // Removed revalidatePath to avoid infinite loops during auto-save.
     return { success: true, data: book };
   } catch (error) {
     console.error('Failed to update book bible:', error);

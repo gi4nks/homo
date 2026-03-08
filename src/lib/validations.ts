@@ -28,6 +28,8 @@ export const UpdateBookBibleSchema = z.object({
   styleReference: z.string().optional(),
   authorialIntent: z.string().optional(),
   loreConstraints: z.string().optional(),
+  globalAuditReport: z.string().optional(),
+  existingLoreConstraints: z.string().optional(),
   genreSpecificGoals: z.string().optional(),
   genreId: z.string().uuid().nullable().optional(),
   tone: z.string().max(5000).optional(),
@@ -50,6 +52,7 @@ export const UpdateChapterSchema = z.object({
   orderIndex: z.number().int().positive().optional(),
   chapterNumber: z.number().int().positive().optional(),
   chapterGoal: z.string().optional(),
+  auditReport: z.string().optional(),
 });
 export type UpdateChapterInput = z.infer<typeof UpdateChapterSchema>;
 
@@ -81,6 +84,7 @@ export const UpdateSceneSchema = z.object({
   orderIndex: z.number().int().positive().optional(),
   sceneNumber: z.number().int().positive().optional(),
   isLocked: z.boolean().optional(),
+  auditReport: z.string().optional(),
   defaultAiProfileId: z.string().uuid().nullable().optional(),
   defaultPromptTemplateId: z.string().uuid().nullable().optional(),
 });

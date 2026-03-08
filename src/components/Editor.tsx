@@ -5,11 +5,12 @@ import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
 import CharacterCount from '@tiptap/extension-character-count';
-import { 
-  Bold, 
-  Italic, 
-  Heading1, 
-  Heading2, 
+import { Selection } from '@tiptap/pm/state';
+import {
+  Bold,
+  Italic,
+  Heading1,
+  Heading2,
   List,
   Sparkles,
   Moon,
@@ -23,7 +24,8 @@ import {
   Lock,
   ChevronDown,
   ChevronUp,
-  Terminal
+  Terminal,
+  Undo2
 } from 'lucide-react';
 import { useState, useEffect, forwardRef, useImperativeHandle, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -83,7 +85,10 @@ const Editor = forwardRef<EditorRef, EditorProps>(({
   const liveContentRef = useRef(initialContent);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { activeProvider, activeModelName, isFocusMode } = useWorkspaceStore();
+  const { activeProvider, activeModelName, isFocusMode, lastAiEdit, clearLastAiEdit } = useWorkspaceStore();
+
+  // Check if lastAiEdit is recent (< 60 seconds)
+  const isUndoAvailable = lastAiEdit && (Date.now() - lastAiEdit.timestamp) < 60000;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -139,6 +144,20 @@ const Editor = forwardRef<EditorRef, EditorProps>(({
     }
   }, [editor, isLocked]);
 
+  const handleUndoAiEdit = useCallback(() => {
+    if (!lastAiEdit || !editor) return;
+
+    // Restore old content
+    editor.commands.setContent(lastAiEdit.oldContent);
+    liveContentRef.current = lastAiEdit.oldContent;
+
+    // Clear lastAiEdit
+    clearLastAiEdit();
+
+    // Trigger save
+    if (onManualSave) onManualSave(lastAiEdit.oldContent);
+  }, [lastAiEdit, editor, clearLastAiEdit, onManualSave]);
+
   useImperativeHandle(ref, () => ({
     undo: () => editor?.chain().focus().undo().run(),
     redo: () => editor?.chain().focus().redo().run(),
@@ -179,7 +198,7 @@ const Editor = forwardRef<EditorRef, EditorProps>(({
     
     // Deselect
     const { tr } = editor.state;
-    editor.view.dispatch(tr.setSelection(editor.state.selection.constructor.near(tr.doc.resolve(to))));
+    editor.view.dispatch(tr.setSelection(Selection.near(tr.doc.resolve(to))));
 
     // 3. FORCE SAVE (Data integrity)
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -196,6 +215,21 @@ const Editor = forwardRef<EditorRef, EditorProps>(({
       setWordCount(editor.storage.characterCount.words());
     }
   }, [editor]);
+
+  // Keyboard shortcut for Undo AI Edit: Cmd+Shift+Z (Mac) or Ctrl+Shift+Z (Windows)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
+        if (isUndoAvailable && !isLocked) {
+          e.preventDefault();
+          handleUndoAiEdit();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isUndoAvailable, isLocked, handleUndoAiEdit]);
 
   if (!editor) return null;
 
@@ -316,6 +350,19 @@ const Editor = forwardRef<EditorRef, EditorProps>(({
 
       {/* 3. MAIN EDITOR CONTENT */}
       <div className={`flex-1 overflow-y-auto custom-scrollbar !p-0 relative transition-opacity duration-500`}>
+         {/* UNDO AI EDIT BUTTON (Floating) */}
+         {isUndoAvailable && !isLocked && (
+           <div className="fixed bottom-24 right-8 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+             <button
+               onClick={handleUndoAiEdit}
+               className="flex items-center gap-2 px-4 py-2 bg-warning text-warning-content rounded-full shadow-2xl border border-warning/30 hover:scale-105 transition-transform font-bold text-sm uppercase tracking-widest"
+             >
+               <Undo2 size={16} />
+               Undo AI Edit
+             </button>
+           </div>
+         )}
+
          <div className={`prose prose-sm sm:prose-base lg:prose-lg xl:prose-2xl dark:prose-invert font-serif leading-[2.2] mx-auto transition-all duration-500 ${
            isFocusMode ? '!max-w-none !w-full !p-12 !pt-16' : 'max-w-4xl p-12 md:p-24'
          } ${isLocked ? 'cursor-default' : ''}`}>

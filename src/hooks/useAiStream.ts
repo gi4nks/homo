@@ -11,7 +11,7 @@ export function useAiStream() {
 
   const startStream = useCallback(async (
     bookId: string, 
-    sceneId: string, 
+    sceneId?: string | null, 
     profileId?: string, 
     promptTemplateId?: string,
     instruction?: string,
@@ -19,9 +19,9 @@ export function useAiStream() {
     originalVersion?: string,
     revisedVersion?: string,
     liveContent?: string,
-    selectedText?: string // CRITICAL: Added selectedText
+    selectedText?: string 
     ) => {
-    if (!sceneId || !bookId) return;
+    if (!bookId) return;
 
     setIsAiLoading(true);
     setAiProposal("");
@@ -29,41 +29,47 @@ export function useAiStream() {
     setPromptBlueprint(null);
 
     try {
-      // 1. Fetch the blueprint first for transparency
-      const { system, prompt } = await generatePromptData(
-        bookId, 
-        sceneId, 
-        profileId, 
+      // 1. Build prompt once (SSOT) and pass pre-built to server
+      const { system, prompt, staticContext, dynamicContext, tokenEstimate } = await generatePromptData(
+        bookId,
+        sceneId || null,
+        profileId,
         promptTemplateId,
         taskType,
-        selectedText, // Pass selectedText
+        selectedText,
         instruction,
         originalVersion,
         revisedVersion,
         liveContent
       );
-      setPromptBlueprint(`[SYSTEM INSTRUCTION]\n${system}\n\n[USER PROMPT]\n${prompt}`);
 
-      // 2. Start the actual stream
+      // Build blueprint with token usage info
+      const tokenInfo = tokenEstimate
+        ? `\n\n[TOKEN USAGE] ${tokenEstimate.total} / ${tokenEstimate.limit} (${tokenEstimate.usagePercentage.toFixed(0)}%)${tokenEstimate.wasTruncated ? ' [TRUNCATED]' : ''}${tokenEstimate.warning ? `\n⚠️ ${tokenEstimate.warning}` : ''}`
+        : '';
+      setPromptBlueprint(`[SYSTEM INSTRUCTION]\n${system}\n\n[USER PROMPT]\n${prompt}${tokenInfo}`);
+
+      // 2. Stream with pre-built prompt (eliminates redundant server-side rebuild)
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          sceneId, 
-          profileId, 
-          promptTemplateId, 
-          instruction, 
-          taskType,
-          originalVersion,
-          revisedVersion,
-          liveContent,
-          selectedText // Pass selectedText
+        body: JSON.stringify({
+          sceneId: sceneId || undefined,
+          // Pass pre-built prompt to avoid redundant rebuild
+          preBuiltPrompt: { system, prompt, staticContext, dynamicContext }
         })
       });
 
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        // Handle rate limit errors (429) with user-friendly message
+        if (response.status === 429) {
+          const retryAfter = errorData.retryAfter || 60;
+          throw new Error(`Rate limit exceeded. Please wait ${retryAfter} seconds before retrying.`);
+        }
+
         throw new Error(errorData.error || `Stream failed with status ${response.status}`);
       }
 
